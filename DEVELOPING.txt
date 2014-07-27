@@ -1,0 +1,14 @@
+Getting Started with RevFramework development using Eclipse
+-----------------------------------------------------------
+
+1. Download Eclipse Luna from eclipse.org
+
+ I recommend the 'Eclipse for PHP Developers' distribution as it is pretty small
+ and contains the basic tools needed for web development
+
+2. Install the Nodeclipse plugins
+ 
+ Use the 'Installation/Upgrade Instructions'
+ from http://www.nodeclipse.org/updates/
+
+3. Start your project!

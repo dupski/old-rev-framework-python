@@ -1,0 +1,11 @@
+{
+  "name": "rev-framework",
+  "description": "Rev Rapid Application Development Framework",
+  "version": "0.0.1",
+  "dependencies": {
+    "express": "4.7.0",
+    "argparse": "0.1.15",
+    "winston": "0.7.3",
+    "underscore": "1.6.0"
+  }
+}
