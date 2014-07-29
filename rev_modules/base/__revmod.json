@@ -1,0 +1,7 @@
+{
+	"name" : "base",
+	"description" : "Rev Framework Base Module",
+	"version" : "1.0",
+	"depends" : [],
+	"auto_install" : true
+}

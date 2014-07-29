@@ -2,10 +2,18 @@
 'use strict';
 
 var express = require('express');
-var pkg = require('./package.json');
 var path = require('path');
 var winston = require('winston');
+
+var pkg = require('./package.json');
 var cloader = require('./utils/configloader');
+var mloader = require('./utils/moduleloader');
+
+exports.config = null;
+exports.log = null;
+exports.express_app = null;
+exports.models = null;
+exports.RevModel = require('./core/rev_model').RevModel;
 
 var config = exports.config = cloader.loadConfig();
 //console.dir(config);
@@ -22,6 +30,8 @@ var log = exports.log = new (winston.Logger)({
 
 log.info('RevFramework v%s Initialising...', pkg.version);
 log.info('Config file: %s', config.config);
+
+var models = exports.models = mloader.loadModules();
 
 var express_app = exports.express_app = express();
 
