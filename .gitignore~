@@ -9,5 +9,4 @@ revserver.conf
 
 # IDE Files (eclipse)
 .project
-.pydevproject
 .settings
