@@ -7,7 +7,8 @@ environment
 # Local settings
 revserver.conf
 
-# IDE Files (eclipse)
+# IDE and Editor Files
 .project
 .pydevproject
 .settings
+*~
