@@ -53,7 +53,7 @@ def load_modules(db):
 	module_obj = RevModules(registry)
 
 	# Get differences between database list of modules and installed modules
-	module_changes = module_obj.get_module_meta_changes(available_modules)
+	module_changes = module_obj.get_module_metadata_changes(available_modules)
 	
 	if module_changes:
 		print('The following module changes were detected:')
@@ -63,15 +63,30 @@ def load_modules(db):
 			print('REMOVED MODULES: ', ', '.join(module_changes['removed_modules']))
 		if 'changed_modules' in module_changes:
 			print('CHANGED MODULES: ')
-			for mod_name, mod_change_list in module_changes['changed_modules'].items():
-				print(' MODULE: ', mod_name)
-				for chg in mod_change_list:
-					print('   ', chg)
+			for mod_name, mod_change in module_changes['changed_modules'].items():
+				print('  MODULE: ', mod_name)
+				if 'new' in mod_change:
+					print('    NEW KEYS:')
+					for key in mod_change['new']:
+						print('     ', key)
+				if 'updated' in mod_change:
+					print('    UPDATED KEYS:')
+					for key in mod_change['updated']:
+						print('     ', key)
+				if 'deleted' in mod_change:
+					print('    DELETED KEYS: ', ', '.join(mod_change['deleted']))
 		
 		response = ''
 		while response not in ['y','n']:
 			response = input("Do you want to update the module metadata in database '{}'? (y/n): ".format(db.name)).lower()
 		
+		if response == 'n':
+			print('Cannot continue without up-to-date module metadata.')
+			sys.exit(1)
+		
+		module_obj.update_module_metadata(available_modules)
+	
+	
 # 	known_modules = module_obj.find(read_fields=['name','status'])
 # 	known_module_info = {}
 # 	for mod in known_modules:
