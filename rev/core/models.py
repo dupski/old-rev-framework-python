@@ -38,12 +38,25 @@ class RevModel():
         if self._table_name not in db.collection_names():
             rev.log.info('Creating Collection %s', self._table_name)
             db.create_collection(self._table_name)
+        
+        if hasattr(self, '_unique'):
+            for unq_key in self._unique:
+                # TODO: Support compound keys
+                if isinstance(unq_key, str):
+                    rev.log.debug('Ensuring Unique constraint for %s', unq_key)
+                    db[self._table_name].ensure_index(unq_key, unique=True )
                 
     def post_init(self):
         pass # Hook to run after validation and before application start
 
-    def find(self, spec={}, read_fields=[], limit=80):
+    def find(self, spec={}, read_fields=[], limit=80, count_only=False):
+        if not read_fields:
+            # Make sure we read all fields then
+            read_fields = None
         db = self.registry.db
         cr = db[self._table_name].find(spec=spec, fields=read_fields, limit=limit)
-        res = [x for x in cr]
-        return res
+        if count_only:
+            return cr.count()
+        else:
+            res = [x for x in cr]
+            return res

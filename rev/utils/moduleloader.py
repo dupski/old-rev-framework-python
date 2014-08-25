@@ -52,10 +52,30 @@ def load_modules(db):
 	# Initialise the RevModule model
 	module_obj = RevModules(registry)
 
-	known_modules = module_obj.find(read_fields=['name','status'])
-	known_module_info = {}
-	for mod in known_modules:
-		known_module_info[mod['name']] = {'_id' : mod['_id'], 'status' : mod['status']}
+	# Get differences between database list of modules and installed modules
+	module_changes = module_obj.get_module_meta_changes(available_modules)
+	
+	if module_changes:
+		print('The following module changes were detected:')
+		if 'new_modules' in module_changes:
+			print('NEW MODULES: ', ', '.join(module_changes['new_modules']))
+		if 'removed_modules' in module_changes:
+			print('REMOVED MODULES: ', ', '.join(module_changes['removed_modules']))
+		if 'changed_modules' in module_changes:
+			print('CHANGED MODULES: ')
+			for mod_name, mod_change_list in module_changes['changed_modules'].items():
+				print(' MODULE: ', mod_name)
+				for chg in mod_change_list:
+					print('   ', chg)
+		
+		response = ''
+		while response not in ['y','n']:
+			response = input("Do you want to update the module metadata in database '{}'? (y/n): ".format(db.name)).lower()
+		
+# 	known_modules = module_obj.find(read_fields=['name','status'])
+# 	known_module_info = {}
+# 	for mod in known_modules:
+# 		known_module_info[mod['name']] = {'_id' : mod['_id'], 'status' : mod['status']}
 		
 # 	
 # 	available_modules = []
@@ -68,21 +88,3 @@ def load_modules(db):
 # 				rev.log.info('Loading Models...')
 
 	return registry
-
-class ModuleSet():
-	
-	def __init__(self, available_modules):
-		self.available_modules = available_modules
-		self.modules = {}
-	
-	def add_module(self, name, parent_stack=[]):
-		if name not in self.available_modules:
-			if parent_stack:
-				raise Exception("Module '{}' required by '{}' cannot be found!".format(name, parent_stack[-1]))
-			else:
-				raise Exception("Module '{}' cannot be found!".format(name))
-		if name not in self.modules:
-			self.modules[name] = self.available_modules[name]
-			for dep in self.modules[name]['depends']:
-				pass
-			
