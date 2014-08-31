@@ -38,7 +38,7 @@ def load_modules(db):
 			exec(open(rev_conf_file).read(), {}, module_info)			
 
 			if module_info.get('depends') == None:
-				raise Exception("Module '{}' __rev__.conf does not contain any dependancy information".format(mod_folder))
+				raise Exception("Module '{}' __rev__.conf does not contain any dependency information".format(mod_folder))
 			
 			available_modules[mod_folder] = module_info
 	
@@ -53,6 +53,7 @@ def load_modules(db):
 	module_obj = RevModules(registry)
 
 	# Get differences between database list of modules and installed modules
+	rev.log.info("Checking Module Metadata is up-to-date...")
 	module_changes = module_obj.get_module_metadata_changes(available_modules)
 	
 	if module_changes:
@@ -65,12 +66,8 @@ def load_modules(db):
 			print('CHANGED MODULES: ')
 			for mod_name, mod_change in module_changes['changed_modules'].items():
 				print('  MODULE: ', mod_name)
-				if 'new' in mod_change:
-					print('    NEW KEYS: ', ', '.join(mod_change['new']))
 				if 'updated' in mod_change:
 					print('    UPDATED KEYS: ', ', '.join(mod_change['updated']))
-				if 'deleted' in mod_change:
-					print('    DELETED KEYS: ', ', '.join(mod_change['deleted']))
 		
 		response = ''
 		while response not in ['y','n']:
@@ -81,6 +78,24 @@ def load_modules(db):
 			sys.exit(1)
 		
 		module_obj.update_module_metadata(available_modules)
+	
+	# Check for modules set to 'auto_install' that are not installed
+	mods_to_auto_install = module_obj.find({'auto_install' : True, 'status' : 'not_installed'}, read_fields=['name'])
+	
+	if mods_to_auto_install:
+
+		mod_names = [mod['name'] for mod in mods_to_auto_install]
+
+		print('The following modules are set to auto-install and are not currently installed:')
+		print(', '.join(mod_names))
+
+		response = ''
+		while response not in ['y','n']:
+			response = input("Do you want to install them? (y/n): ").lower()
+		
+		if response == 'y':
+			module_obj.schedule_operation('install', mod_names)
+		
 	
 	
 # 	known_modules = module_obj.find(read_fields=['name','status'])

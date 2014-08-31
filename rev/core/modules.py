@@ -9,7 +9,8 @@ MODULE_STATUSES = [
     ('not_installed', _('Not Installed')),
     ('to_install', _('To Be Installed')),
     ('installed', _('Installed')),
-    ('to_upgrade', _('To Be Upgraded')),
+    ('to_update', _('To Be Updated')),
+    ('to_remove', _('To Be Removed')),
 ]
 
 class RevModules(RevModel):
@@ -24,7 +25,7 @@ class RevModules(RevModel):
     db_version = fields.TextField(_('Installed Version'))
     status = fields.SelectionField(_('Status'), default_value='not_installed')
     depends = fields.MultiSelectionField(_('Dependancies'), required=False)
-    auto_install = fields.BooleanField(_('Automatically Installed?'))
+    auto_install = fields.BooleanField(_('Automatically Installed?'), required=False)
     
     _unique = ['name']
         
@@ -64,15 +65,8 @@ class RevModules(RevModel):
                     if meta_key == 'version':
                         meta_key = 'module_version'
                     
-                    if meta_key not in db_mod_info:
-                        _add_change(mod_name, 'new', meta_key)
-                    
-                    elif meta_value != db_mod_info[meta_key]:
+                    if meta_value != db_mod_info[meta_key]:
                         _add_change(mod_name, 'updated', meta_key)
-                
-                for key in db_mod_info:
-                    if key not in available_modules[mod_name] and key not in  ['id', 'status', 'db_version', 'module_version', 'module_name', 'module_description']:
-                        _add_change(mod_name, 'deleted', str(key))
                 
         missing_modules = self.find({'name' : {'$nin' : list(available_modules.keys())}}, read_fields=['name'])
         if missing_modules:
@@ -131,7 +125,78 @@ class RevModules(RevModel):
             if 'removed_modules' in module_changes and module_changes['removed_modules']:
                 del_ids = [db_ids[mod_name] for mod_name in module_changes['removed_modules']]
                 self.delete(del_ids)
+    
+    def schedule_operation(self, operation,  module_names, dependency_stack=[]):
+        """
+        Schedules the install, update or removal of the specified modules and their dependencies
+        
+        Operation can be 'install', 'update' or 'remove'
+        
+        Returns True when done
+        """
+
+        def _build_dep_str(mod_name):
+            # Return the full dependency path (e.g. revcrm_opportunity -> revcrm_base -> rev_base))
+            if not dependency_stack:
+                return mod_name
+            else:
+                return ' -> '.join(dependency_stack) + (', ' + mod_name) if mod_name else ''
+
+        for mod in module_names:
+            if mod in dependency_stack:
+                raise ValidationError("Circular Module Dependency Detected!: " + _build_dep_str(mod))
+        
+        mod_data = self.find({'name' : {'$in' : module_names}}, read_fields='*')
+        mod_data = dict( [(mod['name'], mod) for mod in mod_data] )
+                
+        for mod in module_names:
+            if mod not in mod_data:
+                raise ValidationError("Unknown Module '{}' required by '{}'".format(mod, _build_dep_str('')))
+            
+            if operation == 'install':
+                # If this module is not currently installed, install it!
+                if mod_data[mod]['status'] == 'not_installed':
+                    self.update([mod_data[mod]['id']], {'status' : 'to_install'})
+                # Make sure all current dependencies are installed as well
+                if mod_data[mod]['depends']:
+                    dstack = dependency_stack.copy()
+                    dstack.append(mod)
+                    self.schedule_operation('install', mod_data[mod]['depends'], dstack)
+            
+            elif operation == 'update':
+                # if this module is not installed, then we should install it
+                if mod_data[mod]['status'] == 'not_installed':
+                    self.update([mod_data[mod]['id']], {'status' : 'to_install'})
+                    # Make sure all current dependencies are installed as well
+                    # (only do this if it was not installed)
+                    if mod_data[mod]['depends']:
+                        self.schedule_operation('install', mod_data[mod]['depends'], [])
+                
+                elif mod_data[mod]['status'] == 'installed':
+                    self.update([mod_data[mod]['id']], {'status' : 'to_update'})
+                    # Make sure all modules that depend on this one are also scheduled for an update
+                    dep_mods = self.find({'depends' : mod}, read_fields=['name'])
+                    if dep_mods:
+                        dstack = dependency_stack.copy()
+                        dstack.append(mod)
+                        self.schedule_operation('update', [m['name'] for m in dep_mods], dstack)
+            
+            elif operation == 'remove':
+                # If this module is scheduled for install, then just cancel that
+                if mod_data[mod]['status'] == 'to_install':
+                    self.update([mod_data[mod]['id']], {'status' : 'not_installed'})
+                # otherwise mark it for removal, as appropriate
+                elif mod_data[mod]['status'] not in ['not_installed', 'to_remove']:
+                    self.update([mod_data[mod]['id']], {'status' : 'to_remove'})
+                    # Also make sure any modules that depend on this one are scheduled for removal too
+                    dep_mods = self.find({'depends' : mod}, read_fields=['name'])
+                    if dep_mods:
+                        dstack = dependency_stack.copy()
+                        dstack.append(mod)
+                        self.schedule_operation('remove', [m['name'] for m in dep_mods], dstack)
                     
+        return True
+    
     def uninstall_module(self, module_name):
         raise Exception('Module Uninstallation Not Yet Implemented!')
     

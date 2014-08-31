@@ -101,7 +101,7 @@ class RevModel():
             res = []
             for rec in cr:
                 if rec['_id']:
-                    rec['id'] = rec['_id']
+                    rec['id'] = str(rec['_id'])
                     del rec['_id']
                 #TODO: Process function fields, etc.
                 res.append(rec)
