@@ -46,6 +46,9 @@ RevModel Methods
 The code snippet above shows the use of the **find()** method. Of course there
 are many more methods available for RevModel and these are listed below:
 
+Creating and Updating Data
+--------------------------
+
 .. py:function:: create(vals[, context={}])
 
    Creates a new record, and returns the new **id** of the created record.
@@ -60,7 +63,7 @@ are many more methods available for RevModel and these are listed below:
 
 .. py:function:: update(id, vals[, context={}])
    
-   Updates an existing record, using the new values specified in vals, and
+   Updates an existing record using the new values specified in vals, and
    returns True on success.
    
    Any value errors will raise a ``rev.core.exceptions.ValidationException``
@@ -68,5 +71,18 @@ are many more methods available for RevModel and these are listed below:
    **Parameters**
    
    * **id** - the id of the record to update
-   * **vals** - the fields and values that you want to update
+   * **vals** - the fields and values that you want to set
+   * **context** - See :ref:`understanding-context`
+
+.. py:function:: update_multiple(id_list, vals[, context={}])
+   
+   Updates multiple existing records using the new values specified in vals.
+   returns True on success.
+   
+   Any value errors will raise a ``rev.core.exceptions.ValidationException``
+   
+   **Parameters**
+   
+   * **id_list** - the list of ids of the records to update
+   * **vals** - the fields and values that you want to set
    * **context** - See :ref:`understanding-context`

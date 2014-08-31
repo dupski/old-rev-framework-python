@@ -4,6 +4,8 @@ import rev
 from rev.core.fields import RevField
 from rev.core.exceptions import ValidationException
 
+from bson.objectid import ObjectId
+
 class RevModelRegistry():
     
     def __init__(self, db):
@@ -69,10 +71,12 @@ class RevModel():
             return res
     
     def validate_field_values(self, vals):
-        """Validates the provided field values against the RevFields defined on
+        """
+        Validates the provided field values against the RevFields defined on
         the object.
         
-        Raises a rev.core.exceptions.ValidationException if there is a problem"""
+        Raises a rev.core.exceptions.ValidationException if there is a problem
+        """
         
         extra_fields = set(vals.keys()) - set(self._fields.keys())
         
@@ -83,7 +87,10 @@ class RevModel():
             self._fields[field_name].validate_value(self, field_name, vals[field_name])
     
     def create(self, vals, context={}):
-        
+        """
+        Creates a new record. Returns the id of the created record
+        """
+
         create_vals = {}
         
         # Start from default values
@@ -98,4 +105,34 @@ class RevModel():
         db = self.registry.db
         id = db[self._table_name].insert(create_vals)
         
-        return id
+        return id        
+
+    def update(self, id, vals, context={}):
+        """
+        Updates an existing record. Returns True if successful
+        """
+                
+        self.validate_field_values(vals)
+        
+        id = ObjectId(id)
+        
+        # Do Update
+        db = self.registry.db
+        res = db[self._table_name].update({'_id' : id}, {'$set' : vals})
+        
+        return True
+
+    def update_multiple(self, id_list, vals, context={}):
+        """
+        Updates multiple existing records. Returns True if successful
+        """
+                
+        self.validate_field_values(vals)
+        
+        id_list = [ObjectId(id) for id in id_list]
+        
+        # Do Update
+        db = self.registry.db
+        res = db[self._table_name].update({'_id' : {'$in' : id_list}}, {'$set' : vals}, multi=True)
+        
+        return True

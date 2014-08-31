@@ -66,13 +66,9 @@ def load_modules(db):
 			for mod_name, mod_change in module_changes['changed_modules'].items():
 				print('  MODULE: ', mod_name)
 				if 'new' in mod_change:
-					print('    NEW KEYS:')
-					for key in mod_change['new']:
-						print('     ', key)
+					print('    NEW KEYS: ', ', '.join(mod_change['new']))
 				if 'updated' in mod_change:
-					print('    UPDATED KEYS:')
-					for key in mod_change['updated']:
-						print('     ', key)
+					print('    UPDATED KEYS: ', ', '.join(mod_change['updated']))
 				if 'deleted' in mod_change:
 					print('    DELETED KEYS: ', ', '.join(mod_change['deleted']))
 		

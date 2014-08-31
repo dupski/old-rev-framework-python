@@ -12,3 +12,6 @@ revserver.conf
 .pydevproject
 .settings
 *~
+
+# Built Docs
+_build/

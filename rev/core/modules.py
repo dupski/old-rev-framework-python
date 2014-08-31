@@ -62,10 +62,10 @@ class RevModules(RevModel):
                         meta_key = 'module_version'
                     
                     if meta_key not in db_mod_info:
-                        _add_change(mod_name, 'new', '{}: {}'.format(meta_key, meta_value))
+                        _add_change(mod_name, 'new', meta_key)
                     
                     elif meta_value != db_mod_info[meta_key]:
-                        _add_change(mod_name, 'updated', '{}: {}'.format(meta_key, meta_value))
+                        _add_change(mod_name, 'updated', meta_key)
                 
                 for key in db_mod_info:
                     if key not in available_modules[mod_name] and key not in  ['_id', 'status', 'db_version', 'module_version', 'module_name', 'module_description']:
@@ -90,6 +90,14 @@ class RevModules(RevModel):
             'depends' : module_info.get('depends', None),
             'auto_install' : module_info.get('auto_install', False),
         }
+    
+    def _get_module_ids(self):
+        """Return dictionary mapping module names to database ids"""
+        mod_list = self.find({}, read_fields=['name'])
+        res = {}
+        for mod in mod_list:
+            res[mod['name']] = mod['_id']
+        return res
          
     def update_module_metadata(self, available_modules):
         """Takes a dictionary of module information and updates the
@@ -104,5 +112,11 @@ class RevModules(RevModel):
                     mod_vals = self._get_module_db_vals(mod_name, available_modules[mod_name])
                     mod_vals['db_version'] = mod_vals['module_version'] 
                     mod_id = self.create(mod_vals)
+            if 'changed_modules' in module_changes:
+                db_ids = self._get_module_ids()
+                for mod_name in module_changes['changed_modules']:
+                    mod_vals = self._get_module_db_vals(mod_name, available_modules[mod_name])
+                    self.update(db_ids[mod_name], mod_vals)
                     
-                    print(mod_id)
+    def uninstall_module(self, module_name):
+        raise Exception('Module Uninstallation Not Yet Implemented!')
