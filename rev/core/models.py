@@ -2,9 +2,15 @@
 import re
 import rev
 from rev.core.fields import RevField
-from rev.core.exceptions import ValidationException
+from rev.core.exceptions import ValidationError
 
+import pymongo
 from bson.objectid import ObjectId
+
+ORDER_BY_OPTIONS = {
+    'asc' : pymongo.ASCENDING,
+    'desc' : pymongo.DESCENDING,
+}
 
 class RevModelRegistry():
     
@@ -57,17 +63,48 @@ class RevModel():
                 
     def post_init(self):
         pass # Hook to run after validation and before application start
+    
+    def find(self, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
+        """
+        Search the database using the specified criteria, and return the matching data
+        """
 
-    def find(self, spec={}, read_fields=[], limit=80, count_only=False, context={}):
-        if not read_fields:
-            # Make sure we read all fields then
-            read_fields = None
+        if 'id' in criteria:
+            # replace 'id' with '_id' and also convert the string values to BSON ObjectIds
+            if isinstance(criteria['id'], str):
+                criteria['_id'] = ObjectId(criteria['id'])
+            elif isinstance(criteria['id'], dict) and isinstance(criteria['id'].get('$in'), list):
+                criteria['_id'] = {'$in' : [ObjectId(x) for x in criteria['id']['$in']]}
+
+            del criteria['id']
+        
+        if count_only:
+            read_fields = []
+            order_by = None
+            limit = None
+            offset = None
+        else:
+            if read_fields == '*':
+                # Make sure we read all fields then
+                read_fields = None
+            if order_by:
+                # Replace asc / desc with db value
+                for ob_key, ob_val in enumerate(order_by):
+                    ob_val[1] = ORDER_BY_OPTIONS[ob_val[1]]
+        
         db = self.registry.db
-        cr = db[self._table_name].find(spec=spec, fields=read_fields, limit=limit)
+        cr = db[self._table_name].find(spec=criteria, fields=read_fields, sort=order_by, limit=limit, skip=offset)
+        
         if count_only:
             return cr.count()
         else:
-            res = [x for x in cr]
+            res = []
+            for rec in cr:
+                if rec['_id']:
+                    rec['id'] = rec['_id']
+                    del rec['_id']
+                #TODO: Process function fields, etc.
+                res.append(rec)
             return res
     
     def validate_field_values(self, vals):
@@ -75,13 +112,13 @@ class RevModel():
         Validates the provided field values against the RevFields defined on
         the object.
         
-        Raises a rev.core.exceptions.ValidationException if there is a problem
+        Raises a rev.core.exceptions.ValidationError if there is a problem
         """
         
         extra_fields = set(vals.keys()) - set(self._fields.keys())
         
         if extra_fields != set():
-            raise ValidationException("Object '{}' does not have the following fields: {}".format(self._name, ', '.join(extra_fields)))
+            raise ValidationError("Object '{}' does not have the following fields: {}".format(self._name, ', '.join(extra_fields)))
         
         for field_name in vals:
             self._fields[field_name].validate_value(self, field_name, vals[field_name])
@@ -107,32 +144,32 @@ class RevModel():
         
         return id        
 
-    def update(self, id, vals, context={}):
+    def update(self, ids, vals, context={}):
         """
-        Updates an existing record. Returns True if successful
+        Updates existing records. Returns True if successful
         """
                 
         self.validate_field_values(vals)
-        
-        id = ObjectId(id)
-        
-        # Do Update
-        db = self.registry.db
-        res = db[self._table_name].update({'_id' : id}, {'$set' : vals})
-        
-        return True
 
-    def update_multiple(self, id_list, vals, context={}):
-        """
-        Updates multiple existing records. Returns True if successful
-        """
-                
-        self.validate_field_values(vals)
-        
-        id_list = [ObjectId(id) for id in id_list]
+        id_list = []
+        for id in ids:
+            id_list.append(ObjectId(id))
         
         # Do Update
         db = self.registry.db
         res = db[self._table_name].update({'_id' : {'$in' : id_list}}, {'$set' : vals}, multi=True)
         
         return True
+    
+    def delete(self, ids, context={}):
+        """
+        Deletes existing records. Returns True if successful
+        """
+
+        id_list = []
+        for id in ids:
+            id_list.append(ObjectId(id))
+        
+        # Do Delete
+        db = self.registry.db
+        res = db[self._table_name].remove({'_id' : {'$in' : id_list}}, multi=True)

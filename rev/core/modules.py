@@ -3,6 +3,8 @@ from rev.core.models import RevModel
 from rev.core import fields
 from rev.core.translations import translate as _
 
+from rev.core.exceptions import ValidationError
+
 MODULE_STATUSES = [
     ('not_installed', _('Not Installed')),
     ('to_install', _('To Be Installed')),
@@ -27,7 +29,8 @@ class RevModules(RevModel):
     _unique = ['name']
         
     def get_module_metadata_changes(self, available_modules):
-        """Takes a dictionary of module information and compares it to the
+        """
+        Takes a dictionary of module information and compares it to the
         module information currently held in the database.
         
         Returns a dictionary with the following keys (if they apply):
@@ -39,7 +42,7 @@ class RevModules(RevModel):
         res = {}
                 
         for mod_name in available_modules:
-            db_mod_info = self.find({'name' : mod_name})
+            db_mod_info = self.find({'name' : mod_name}, read_fields='*')
             
             if not db_mod_info:
                 res.setdefault('new_modules', []).append(mod_name)
@@ -68,7 +71,7 @@ class RevModules(RevModel):
                         _add_change(mod_name, 'updated', meta_key)
                 
                 for key in db_mod_info:
-                    if key not in available_modules[mod_name] and key not in  ['_id', 'status', 'db_version', 'module_version', 'module_name', 'module_description']:
+                    if key not in available_modules[mod_name] and key not in  ['id', 'status', 'db_version', 'module_version', 'module_name', 'module_description']:
                         _add_change(mod_name, 'deleted', str(key))
                 
         missing_modules = self.find({'name' : {'$nin' : list(available_modules.keys())}}, read_fields=['name'])
@@ -79,8 +82,10 @@ class RevModules(RevModel):
         return res
     
     def _get_module_db_vals(self, module_name, module_info):
-        """Take values from the module configuration and build the data needed
-        for a rev.modules record"""
+        """
+        Take values from the module configuration and build the data needed
+        for a rev.modules record
+        """
         
         return {
             'name' : module_name,
@@ -92,31 +97,50 @@ class RevModules(RevModel):
         }
     
     def _get_module_ids(self):
-        """Return dictionary mapping module names to database ids"""
+        """
+        Return dictionary mapping module names to database ids
+        """
         mod_list = self.find({}, read_fields=['name'])
         res = {}
         for mod in mod_list:
-            res[mod['name']] = mod['_id']
+            res[mod['name']] = mod['id']
         return res
          
     def update_module_metadata(self, available_modules):
-        """Takes a dictionary of module information and updates the
+        """
+        Takes a dictionary of module information and updates the
         module information currently held in the database.
         """
         
         module_changes = self.get_module_metadata_changes(available_modules)
         
         if module_changes:
+            db_ids = self._get_module_ids()
+            
             if 'new_modules'in module_changes:
                 for mod_name in module_changes['new_modules']:
                     mod_vals = self._get_module_db_vals(mod_name, available_modules[mod_name])
                     mod_vals['db_version'] = mod_vals['module_version'] 
                     mod_id = self.create(mod_vals)
+            
             if 'changed_modules' in module_changes:
-                db_ids = self._get_module_ids()
                 for mod_name in module_changes['changed_modules']:
                     mod_vals = self._get_module_db_vals(mod_name, available_modules[mod_name])
-                    self.update(db_ids[mod_name], mod_vals)
+                    self.update([db_ids[mod_name]], mod_vals)
+            
+            if 'removed_modules' in module_changes and module_changes['removed_modules']:
+                del_ids = [db_ids[mod_name] for mod_name in module_changes['removed_modules']]
+                self.delete(del_ids)
                     
     def uninstall_module(self, module_name):
         raise Exception('Module Uninstallation Not Yet Implemented!')
+    
+    def delete(self, ids, context={}):
+        """
+        Check that none of the modules we are trying to delete are currently installed!
+        """
+        inst_mods = self.find({'id' : {'$in' : ids}, 'status' : {'$ne' : 'not_installed'}})
+        if inst_mods:
+            raise ValidationError('One or more of the modules you are trying to remove is currently installed!')
+        
+        return super(RevModules, self).delete(ids, context)

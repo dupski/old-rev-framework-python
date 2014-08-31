@@ -86,7 +86,7 @@ def load_modules(db):
 # 	known_modules = module_obj.find(read_fields=['name','status'])
 # 	known_module_info = {}
 # 	for mod in known_modules:
-# 		known_module_info[mod['name']] = {'_id' : mod['_id'], 'status' : mod['status']}
+# 		known_module_info[mod['name']] = {'id' : mod['id'], 'status' : mod['status']}
 		
 # 	
 # 	available_modules = []

@@ -1,5 +1,5 @@
 
-from rev.core.exceptions import ValidationException
+from rev.core.exceptions import ValidationError
 
 class RevField():
     
@@ -14,7 +14,7 @@ class RevField():
     
     def validate_value(self, obj, name, value):
         if self.required and not value:
-            raise ValidationException("Field '{}' on object '{}' is required!".format(name, obj._name))
+            raise ValidationError("Field '{}' on object '{}' is required!".format(name, obj._name))
 
 class TextField(RevField):
     pass
@@ -32,7 +32,7 @@ class MultiSelectionField(RevField):
     
     def validate_value(self, obj, name, value):
         if not isinstance(value, list):
-            raise ValidationException("Invalid value for multi-select field '{}' of object '{}'!".format(name, obj._name))
+            raise ValidationError("Invalid value for multi-select field '{}' of object '{}'!".format(name, obj._name))
 
 class IntegerField(RevField):
     pass
