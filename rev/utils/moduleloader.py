@@ -95,6 +95,14 @@ def load_modules(db):
 		
 		if response == 'y':
 			module_obj.schedule_operation('install', mod_names)
+	
+	# Check for any module changes specified on the command line
+	if rev.config['modules_to_install']:
+		module_obj.schedule_operation('install', rev.config['modules_to_install'].split(','))
+	if rev.config['modules_to_update']:
+		module_obj.schedule_operation('update', rev.config['modules_to_update'].split(','))
+	if rev.config['modules_to_remove']:
+		module_obj.schedule_operation('remove', rev.config['modules_to_remove'].split(','))
 		
 	
 	

@@ -15,12 +15,20 @@ aparser.add_argument('-c', '--config',
             dest='configfile',
             default=os.path.join(os.getcwd(), 'revserver.conf'))
 
-aparser.add_argument('-r', '--no-request-log',
-            help='Disable HTTP Request Logging',
-            dest='log_requests',
-            action='store_false',
-            default=True,
-)
+aparser.add_argument('-i', '--install',
+            help='Specify a comma-seperated list of modules to install',
+            dest='modules_to_install',
+            default=None)
+
+aparser.add_argument('-u', '--update',
+            help='Specify a comma-seperated list of modules to update',
+            dest='modules_to_update',
+            default=None)
+
+aparser.add_argument('-r', '--remove',
+            help='Specify a comma-seperated list of modules to remove',
+            dest='modules_to_remove',
+            default=None)
 
 def load_config():
     
