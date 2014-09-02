@@ -18,6 +18,7 @@ Documentation Contents
    gettingstarted
    modelapi
    context
+   moduleload
 
 
 Indices and tables

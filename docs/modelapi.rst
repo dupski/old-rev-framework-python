@@ -10,8 +10,7 @@ Creating Models
 RevModel is the base class of all data models in a RevFramework app. The code
 snippet below shows an example of creating a model.::
 
-	from rev.core.models import RevModel
-	import rev.core.fields
+	from rev.core import models, fields
 	
 	COLOURS = [
 		('red', 'Red'),
@@ -19,7 +18,7 @@ snippet below shows an example of creating a model.::
 		('blue', 'Blue'),
 	]
 	
-	class MyModel(RevModel):
+	class MyModel(models.RevModel):
 		_name = 'myapp.model'
 		_description = 'A Data Model for use in my application'
 		

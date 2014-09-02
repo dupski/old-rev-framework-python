@@ -60,9 +60,6 @@ class RevModel():
                 if isinstance(unq_key, str):
                     rev.log.debug('Ensuring Unique constraint for %s', unq_key)
                     db[self._table_name].ensure_index(unq_key, unique=True )
-                
-    def post_init(self):
-        pass # Hook to run after validation and before application start
     
     def find(self, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
