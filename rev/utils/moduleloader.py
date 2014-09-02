@@ -56,6 +56,7 @@ def load_modules(db):
 	rev.log.info("Checking Module Metadata is up-to-date...")
 	module_changes = module_obj.get_module_metadata_changes(available_modules)
 	
+	# Prompt user to update database metadata if necessary
 	if module_changes:
 		print('The following module changes were detected:')
 		if 'new_modules' in module_changes:
@@ -87,7 +88,7 @@ def load_modules(db):
 		mod_names = [mod['name'] for mod in mods_to_auto_install]
 
 		print('The following modules are set to auto-install and are not currently installed:')
-		print(', '.join(mod_names))
+		print('  ' + ', '.join(mod_names))
 
 		response = ''
 		while response not in ['y','n']:
@@ -104,7 +105,43 @@ def load_modules(db):
 	if rev.config['modules_to_remove']:
 		module_obj.schedule_operation('remove', rev.config['modules_to_remove'].split(','))
 		
+	# Scan for any scheduled module changes and prompt the user whether to go ahead
+	scheduled_operations = module_obj.find({'status' : {'$in' : ['to_install', 'to_update', 'to_remove']}}, read_fields=['name','status'])
 	
+	if scheduled_operations:
+		ops = {
+			'to_install' : [],
+			'to_update' : [],
+			'to_remove' : [],
+		}
+		for op in scheduled_operations:
+			ops[op['status']].append(op['name'])
+		
+		if ops['to_install']:
+			print('The following modules are about to be INSTALLED:')
+			print('  ' + ', '.join(ops['to_install']))
+		if ops['to_update']:
+			print('The following modules are about to be UPDATED:')
+			print('  ' + ', '.join(ops['to_update']))
+		if ops['to_remove']:
+			print('The following modules are about to be REMOVED:')
+			print('  ' + ', '.join(ops['to_remove']))
+				
+		response = ''
+		while response not in ['y','n']:
+			response = input("Do you want to continue? (y/n): ").lower()
+	
+		if response == 'y':
+			module_obj.do_scheduled_operations()
+			
+		else:
+			response = ''
+			while response not in ['y','n']:
+				response = input("Do you want to cancel the scheduled install/update/remove operations? (y/n): ").lower()
+		
+			if response == 'y':
+				module_obj.cancel_scheduled_operations()
+
 	
 # 	known_modules = module_obj.find(read_fields=['name','status'])
 # 	known_module_info = {}

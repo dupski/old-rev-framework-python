@@ -196,8 +196,31 @@ class RevModules(RevModel):
                         self.schedule_operation('remove', [m['name'] for m in dep_mods], dstack)
                     
         return True
+
+    def cancel_scheduled_operations(self):
+        """
+        Cancel all pending install / update / remove operations
+        """
+        mods = self.find({'status' : {'$in' : ['to_install', 'to_update', 'to_remove']}}, read_fields=['name','status'])
+        mod_ids = {
+            'to_install' : [],
+            'to_update' : [],
+            'to_remove' : [],
+        }
+        for mod in mods:
+            mod_ids[mod['status']].append(mod['id'])
+        if mod_ids['to_install']:
+            self.update(mod_ids['to_install'], {'status' : 'not_installed'})
+        if mod_ids['to_update']:
+            self.update(mod_ids['to_update'], {'status' : 'installed'})
+        if mod_ids['to_remove']:
+            self.update(mod_ids['to_remove'], {'status' : 'installed'})
+            
+            
+    def do_scheduled_operations(self):
+        pass
     
-    def uninstall_module(self, module_name):
+    def do_remove(self, module_name):
         raise Exception('Module Uninstallation Not Yet Implemented!')
     
     def delete(self, ids, context={}):
