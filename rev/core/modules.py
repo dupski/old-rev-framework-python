@@ -1,9 +1,14 @@
 
+import rev
 from rev.core.models import RevModel
 from rev.core import fields
 from rev.core.translations import translate as _
 
 from rev.core.exceptions import ValidationError
+
+from toposort import toposort_flatten
+import importlib
+import os
 
 MODULE_STATUSES = [
     ('not_installed', _('Not Installed')),
@@ -13,9 +18,8 @@ MODULE_STATUSES = [
     ('to_remove', _('To Be Removed')),
 ]
 
-class RevModules(RevModel):
+class RevModule(RevModel):
 
-    _name = 'rev.modules'
     _description = 'Rev Module Information'
     
     name = fields.TextField(_('Module Package Name'))
@@ -215,13 +219,70 @@ class RevModules(RevModel):
             self.update(mod_ids['to_update'], {'status' : 'installed'})
         if mod_ids['to_remove']:
             self.update(mod_ids['to_remove'], {'status' : 'installed'})
+                        
+    def install_and_load(self):
+        """
+        Loads the module hierarchy. If any modules are set to be installed /
+        upgraded / removed, do that too!
+        """
+        
+        # Do module removals first
+        mods_to_remove = self.find({'status' : 'to_remove'}, read_fields='*')
+        if mods_to_remove:
+            mods_to_sort = {}
+            for mod in mods_to_remove:
+                mods_to_sort[mod['name']] = set(mod['depends'])
+            mod_remove_order = toposort_flatten(mods_to_sort)
+            mod_remove_order.reverse()
+            for mod in mod_remove_order:
+                self.do_remove(mod)
+  
+        mods_to_load = self.find({'status' : {'$in' : ['installed','to_install','to_update']}}, read_fields='*')
+        if mods_to_load:
+            mods_to_sort = {}
+            for mod in mods_to_load:
+                mods_to_sort[mod['name']] = set(mod['depends'])
+            mod_load_order = toposort_flatten(mods_to_sort)
             
-            
-    def do_scheduled_operations(self):
-        pass
+            for mod in mod_load_order:
+                
+                rev.log.info('Loading Module: '+mod)
+                
+                # Import the module
+                m = importlib.import_module(mod)
+                
+                # Import the module's models (if present)
+                has_models = False
+                try:
+                    m = importlib.import_module(mod+'.models')
+                    mpath = m.__path__[0]
+                    has_models = True
+                except ImportError:
+                    pass
+                
+                if has_models:
+                    src_files = os.listdir(mpath)
+                    src_files.sort() # make sure theres some kind of determinism for module loading!
+                    
+                    for src_file in src_files:
+                        if src_file == '__init__.py' or src_file[-3:] != '.py':
+                            continue
+                        m = importlib.import_module(mod+'.models.'+src_file[:-3])
+                        
+                        for msymbol in dir(m):
+                            cls = getattr(m, msymbol)
+                            if isinstance(cls, type) and issubclass(cls, RevModel):
     
-    def do_remove(self, module_name):
-        raise Exception('Module Uninstallation Not Yet Implemented!')
+                                # Instantiate model and add to registry
+                                cls(self.registry)
+                                        
+                self.update_data(mod)
+    
+    def update_data(self, module_name):
+        print('TODO: Update data for module: ', module_name)
+    
+    def remove_data(self, module_record):
+        print('TODO: Remove data for module: ', module_record['name'])
     
     def delete(self, ids, context={}):
         """
@@ -231,4 +292,4 @@ class RevModules(RevModel):
         if inst_mods:
             raise ValidationError('One or more of the modules you are trying to remove is currently installed!')
         
-        return super(RevModules, self).delete(ids, context)
+        return super(RevModule, self).delete(ids, context)

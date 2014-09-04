@@ -1,12 +1,10 @@
 
 import rev
 from rev.core.models import RevModelRegistry, RevModel
-from rev.core.modules import RevModules
+from rev.core.modules import RevModule
 
 import os, sys
 import imp
-
-from toposort import toposort_flatten
 
 def load_modules(db):
 	
@@ -50,7 +48,7 @@ def load_modules(db):
 	registry = RevModelRegistry(db)
 
 	# Initialise the RevModule model
-	module_obj = RevModules(registry)
+	module_obj = RevModule(registry)
 
 	# Get differences between database list of modules and installed modules
 	rev.log.info("Checking Module Metadata is up-to-date...")
@@ -131,31 +129,18 @@ def load_modules(db):
 		while response not in ['y','n']:
 			response = input("Do you want to continue? (y/n): ").lower()
 	
-		if response == 'y':
-			module_obj.do_scheduled_operations()
+		if response == 'n':
 			
-		else:
 			response = ''
 			while response not in ['y','n']:
 				response = input("Do you want to cancel the scheduled install/update/remove operations? (y/n): ").lower()
 		
 			if response == 'y':
 				module_obj.cancel_scheduled_operations()
+			else:
+				print("Cannot continue without completing installation or cancelling.")
+				sys.exit(1)
 
-	
-# 	known_modules = module_obj.find(read_fields=['name','status'])
-# 	known_module_info = {}
-# 	for mod in known_modules:
-# 		known_module_info[mod['name']] = {'id' : mod['id'], 'status' : mod['status']}
-		
-# 	
-# 	available_modules = []
-# 
-# 	for mod_path in mod_path_list:
-# 			
-# 			rev.log.info('Loading Module: %s', mod_folder)
-# 			
-# 			if os.path.isdir(os.path.join(mod_path, mod_folder, 'models')):
-# 				rev.log.info('Loading Models...')
+	module_obj.install_and_load()
 
 	return registry
