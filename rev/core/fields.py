@@ -16,18 +16,20 @@ class RevField():
         if self.required and not value:
             raise ValidationError("Field '{}' on object '{}' is required!".format(name, obj._name))
 
+# Plain Value Fields
+
 class TextField(RevField):
     pass
 
 class SelectionField(RevField):
-    def __init__(self, *args, **kwargs):
-        super(SelectionField, self).__init__(*args, **kwargs)
-        self.selection = kwargs.get('selection', [])
+    def __init__(self, label, selection, **kwargs):
+        super(SelectionField, self).__init__(label, **kwargs)
+        self.selection = selection
 
 class MultiSelectionField(RevField):
 
-    def __init__(self, *args, **kwargs):
-        super(MultiSelectionField, self).__init__(*args, **kwargs)
+    def __init__(self, label, selection, **kwargs):
+        super(MultiSelectionField, self).__init__(label, **kwargs)
         self.selection = kwargs.get('selection', [])
     
     def validate_value(self, obj, name, value):
@@ -56,3 +58,25 @@ class DateField(RevField):
 
 class DateTimeField(RevField):
     pass
+
+# Relational Fields
+
+class RecordLinkField(RevField):
+    """
+    Stores links to one or more related records
+    
+    Use the 'multi' keyword argument to allow linking to multiple records
+    """
+    def __init__(self, label, related_model, **kwargs):
+        super(RecordLinkField, self).__init__(label, **kwargs)
+        self.related_model = related_model
+        self.multi = kwargs.get('multi', False)
+
+class RecordListField(RevField):
+    """
+    Returns a list of related database records
+    """
+    def __init__(self, label, related_model, filter, **kwargs):
+        super(RecordListField, self).__init__(label, **kwargs)
+        self.related_model = related_model
+        self.filter = filter
