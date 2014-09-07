@@ -8,7 +8,8 @@ from rev.core.exceptions import ValidationError
 
 from toposort import toposort_flatten
 import importlib
-import os
+import os, sys
+import types
 
 MODULE_STATUSES = [
     ('not_installed', _('Not Installed')),
@@ -237,11 +238,18 @@ class RevModule(RevModel):
             for mod in mod_remove_order:
                 self.do_remove(mod)
   
+        # Install and load modules
+        mods_to_sort = {}
+        mod_info = {}
+        mod_load_order = []
+
         mods_to_load = self.find({'status' : {'$in' : ['installed','to_install','to_update']}}, read_fields='*')
         if mods_to_load:
-            mods_to_sort = {}
+            
             for mod in mods_to_load:
                 mods_to_sort[mod['name']] = set(mod['depends'])
+                mod_info[mod['name']] = mod
+            
             mod_load_order = toposort_flatten(mods_to_sort)
             
             for mod in mod_load_order:
@@ -249,7 +257,11 @@ class RevModule(RevModel):
                 rev.log.info('Loading Module: '+mod)
                 
                 # Import the module
-                m = importlib.import_module(mod)
+                mod_m = importlib.import_module(mod)
+                
+                # Run the before-model-load hook (if applicable)
+                if getattr(mod_m, 'before_model_load', False):
+                    mod_m.before_model_load(self.registry, mod_info[mod])
                 
                 # Import the module's models (if present)
                 has_models = False
@@ -275,8 +287,22 @@ class RevModule(RevModel):
     
                                 # Instantiate model and add to registry
                                 cls(self.registry)
+
+                # Run the after-model-load hook (if applicable)
+                if getattr(mod_m, 'after_model_load', False):
+                    mod_m.after_model_load(self.registry, mod_info[mod])
                                         
                 self.update_data(mod)
+
+                # Run the after-data-load hook (if applicable)
+                if getattr(mod_m, 'after_data_load', False):
+                    mod_m.after_data_load(self.registry, mod_info[mod])
+        
+        # Run the after-app-load hook for all modules (if applicable)
+        for mod in mod_load_order:
+            mod_m = sys.modules[mod]
+            if getattr(mod_m, 'after_app_load', False):
+                mod_m.after_app_load(self.registry, mod_info[mod])
     
     def update_data(self, module_name):
         print('TODO: Update data for module: ', module_name)

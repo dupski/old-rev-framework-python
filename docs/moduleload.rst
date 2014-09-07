@@ -119,7 +119,9 @@ is repeated for every installed module in the dependency tree.
    database collections, constraints and indexes will be created
  
  * **Load Data** - The final stage of the module boot process is to make sure
-   any standard data that the module comes with is loaded into the database
+   any standard data that the module comes with is loaded into the database.
+   When this stage completes, the ``db_version`` property of the module will
+   be updated to match the ``version`` in the module's ``__rev__.conf``
 
 Post Boot Stages
 ----------------
@@ -127,8 +129,8 @@ Post Boot Stages
 Once all the individual modules are loaded, the following final actions are
 carried out:
 
- * **Model Verification** - Now that the system is loaded, it can now verify all
-   of the specified relationships between the models are in fact valid.
+ * **Model Verification** - Now that all models are loaded, it is possible to
+   verify that all of the specified model relationships are valid.
 
 Module Load Hooks
 =================
@@ -142,25 +144,25 @@ a module, and any return values will be ignored.
 Before Model Load
 -----------------
 
-This hook is invoked immediately after the **Module Import** stage and before the
-**Load Models** stage. ::
+This hook is invoked immediately after the **Module Import** stage and before
+the **Load Models** stage. ::
 
-  def before_model_load(registry, operation, db_module_version)
+  def before_model_load(registry, db_module_info)
 
 After Model Load
 ----------------
 
-This hook is invoked once all the models in the module have been loaded, and
-before the module data is loaded. ::
+This hook is invoked immediately after the **Load Models** stage, and before the
+before the **Load Data** stage. ::
 
-  def after_model_load(registry, operation, db_module_version)
+  def after_model_load(registry, db_module_info)
 
 After Data Load
 ---------------
 
-This hook is invoked once all the module's data has been loaded. ::
+This hook is invoked immediately after the **Load Data** stage. ::
 
-  def after_data_load(registry, operation, db_module_version)
+  def after_data_load(registry, db_module_info)
 
 After App Load
 --------------
@@ -168,4 +170,4 @@ After App Load
 This hook is executed on each module in turn, once all the installed modules
 have been fully loaded.
 
-  def after_app_load(registry, operation, db_module_version)
+  def after_app_load(registry, db_module_info)
