@@ -5,6 +5,8 @@ from rev.core import fields
 from rev.core.translations import translate as _
 
 from rev.core.exceptions import ValidationError
+import rev.core.http
+from rev.core.http import RevHTTPController
 
 from toposort import toposort_flatten
 import importlib
@@ -28,8 +30,8 @@ class RevModule(RevModel):
     module_description = fields.TextField(_('Description'), required=False)
     module_version = fields.TextField(_('Module Version'))
     db_version = fields.TextField(_('Installed Version'))
-    status = fields.SelectionField(_('Status'), default_value='not_installed')
-    depends = fields.MultiSelectionField(_('Dependancies'), required=False)
+    status = fields.SelectionField(_('Status'), MODULE_STATUSES, default_value='not_installed')
+    depends = fields.MultiSelectionField(_('Dependancies'), None, required=False)
     auto_install = fields.BooleanField(_('Automatically Installed?'), required=False)
     
     _unique = ['name']
@@ -236,7 +238,7 @@ class RevModule(RevModel):
             mod_remove_order = toposort_flatten(mods_to_sort)
             mod_remove_order.reverse()
             for mod in mod_remove_order:
-                self.do_remove(mod)
+                self._remove_data(mod)
   
         # Install and load modules
         mods_to_sort = {}
@@ -258,6 +260,7 @@ class RevModule(RevModel):
                 
                 # Import the module
                 mod_m = importlib.import_module(mod)
+                module_path = mod_m.__path__[0]
                 
                 # Run the before-model-load hook (if applicable)
                 if getattr(mod_m, 'before_model_load', False):
@@ -267,13 +270,12 @@ class RevModule(RevModel):
                 has_models = False
                 try:
                     m = importlib.import_module(mod+'.models')
-                    mpath = m.__path__[0]
                     has_models = True
                 except ImportError:
                     pass
                 
                 if has_models:
-                    src_files = os.listdir(mpath)
+                    src_files = os.listdir(os.path.join(module_path, 'models'))
                     src_files.sort() # make sure theres some kind of determinism for module loading!
                     
                     for src_file in src_files:
@@ -288,15 +290,46 @@ class RevModule(RevModel):
                                 # Instantiate model and add to registry
                                 cls(self.registry)
 
+                # Initialise the module's http controllers
+                if not rev.core.http.started:
+                    has_http = False
+                    try:
+                        m = importlib.import_module(mod+'.controllers')
+                        has_http = True
+                    except ImportError:
+                        pass
+                    
+                    if has_http:
+                        src_files = os.listdir(os.path.join(module_path, 'controllers'))
+                        src_files.sort()
+                        
+                        for src_file in src_files:
+                            if src_file == '__init__.py' or src_file[-3:] != '.py':
+                                continue
+                            m = importlib.import_module(mod+'.controllers.'+src_file[:-3])
+                            
+                            for msymbol in dir(m):
+                                cls = getattr(m, msymbol)
+                                if isinstance(cls, type) and cls is not RevHTTPController and issubclass(cls, RevHTTPController):
+                                    
+                                    rev.log.debug("Registering HTTP Controller: " + cls.__name__)
+                                    cls.register(rev.core.http.http_app)
+                
+                    # Register template path if the module has a 'templates' folder
+                    template_path = os.path.join(module_path, 'templates')
+                    if os.path.isdir(template_path):
+                        rev.core.http.register_template_path(template_path)
+
                 # Run the after-model-load hook (if applicable)
                 if getattr(mod_m, 'after_model_load', False):
                     mod_m.after_model_load(self.registry, mod_info[mod])
                                         
-                self.update_data(mod)
-
-                # Run the after-data-load hook (if applicable)
-                if getattr(mod_m, 'after_data_load', False):
-                    mod_m.after_data_load(self.registry, mod_info[mod])
+                if mod_info[mod]['status'] != 'installed':
+                    self._update_data(mod_info[mod], module_path)
+    
+                    # Run the after-data-load hook (if applicable)
+                    if getattr(mod_m, 'after_data_load', False):
+                        mod_m.after_data_load(self.registry, mod_info[mod])
         
         # Run the after-app-load hook for all modules (if applicable)
         for mod in mod_load_order:
@@ -304,10 +337,15 @@ class RevModule(RevModel):
             if getattr(mod_m, 'after_app_load', False):
                 mod_m.after_app_load(self.registry, mod_info[mod])
     
-    def update_data(self, module_name):
-        print('TODO: Update data for module: ', module_name)
+    def _update_data(self, mod_info, mod_path):
+        rev.log.info('Loading Module Data for '+mod_info['name'])
+        # TODO... that! :)...
+        self.update([mod_info['id']], {
+            'status' : 'installed',
+            'db_version' : mod_info['module_version'],
+        })
     
-    def remove_data(self, module_record):
+    def _remove_data(self, module_record):
         print('TODO: Remove data for module: ', module_record['name'])
     
     def delete(self, ids, context={}):

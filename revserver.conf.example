@@ -2,7 +2,7 @@
 # Rev Server Sample Configuration File
 
 server_address = '127.0.0.1'
-server_port = 8800
+server_port = 8888
 
 log_requests: True
 

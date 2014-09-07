@@ -30,7 +30,7 @@ rev.log.info('{} v{} Initialising...'.format(PKG_NAME, PKG_VERSION))
 
 rev.config = configloader.load_config()
 
-# TODO: Connect to database
+# Connect to Database
 rev.log.info("Database Server: {}:{}".format(rev.config['db_host'], rev.config['db_port']))
 rev.log.info("Database Name: {}".format(rev.config['db_name']))
 
@@ -38,4 +38,12 @@ from pymongo import MongoClient
 dbclient = MongoClient(rev.config['db_host'], rev.config['db_port'])
 db = dbclient[rev.config['db_name']]
 
+# Initialise HTTP Server
+import rev.core.http
+rev.core.http.init(rev.config)
+
+# Load and initialise modules
 rev.registry = moduleloader.load_modules(db)
+
+# Start HTTP Server
+rev.core.http.start(rev.config)
