@@ -63,10 +63,15 @@ class RevModel():
         
         if hasattr(self, '_unique'):
             for unq_key in self._unique:
-                # TODO: Support compound keys
-                if isinstance(unq_key, str):
+                if unq_key:
                     rev.log.debug('Ensuring Unique Constraint for: %s', unq_key)
-                    db[self._table_name].ensure_index(unq_key, unique=True )
+                    if isinstance(unq_key, str):
+                        db[self._table_name].ensure_index(unq_key, unique=True )
+                    elif isinstance(unq_key, (list, tuple)):
+                        index_spec = []
+                        for unq_field in unq_key:
+                            index_spec.append((unq_field, pymongo.ASCENDING))
+                        db[self._table_name].ensure_index(index_spec, unique=True )
     
     def find(self, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
