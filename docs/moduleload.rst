@@ -20,7 +20,7 @@ The primary aims of the module system are:
    automatically install all dependencies when installing a new module, or
    when updating it (including other Rev modules)
 
- * Easy upgrades during development and in the live environment (no buggering
+ * Easy upgrades during development and in the live environment (no messing
    about with migration files!!)
 
  * All aspects of modules (including the Rev Core modules) should be extensible,
