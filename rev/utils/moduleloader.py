@@ -1,6 +1,6 @@
 
 import rev
-from rev.core.models import RevModelRegistry, RevModel
+from rev.core.models import RevModelRegistry, RevModel, registry
 from rev.core.modules import RevModule
 
 import os, sys
@@ -46,6 +46,7 @@ def load_modules(db):
 				
 	# Create Model Registry
 	registry = RevModelRegistry(db)
+	rev.core.models.registry = registry
 
 	# Initialise the RevModule model
 	module_obj = RevModule(registry)

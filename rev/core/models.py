@@ -12,6 +12,9 @@ ORDER_BY_OPTIONS = {
     'desc' : pymongo.DESCENDING,
 }
 
+# We currently support just one model registry
+registry = None
+
 class RevModelRegistry():
     
     def __init__(self, db):

@@ -15,7 +15,7 @@ Imagine we've created a model, and overriden the ``update`` method so it
 recalculates some values every time a record is updated. ::
    
    def update(self, id, vals, context={}):
-      super(MyModel, self).update(id, vals, context)
+      super().update(id, vals, context)
       self._recalculate_values(id)
 
    def _recalculate_values(self, id):
@@ -35,7 +35,7 @@ functions to help control their behaviour. Lets re-write the example above to
 make use of context. ::
    
    def update(self, id, vals, context={}):
-      super(MyModel, self).update(id, vals, context)
+      super().update(id, vals, context)
       
       if 'no_recalculate' not in context:
          self._recalculate_values(id)

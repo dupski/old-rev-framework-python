@@ -21,7 +21,7 @@ class RevHTTP(Flask):
     ))
     
     def __init__(self, *args, **kwargs):
-        return super(RevHTTP, self).__init__('rev', *args, **kwargs)
+        return super().__init__('rev', *args, **kwargs)
 
 class RevHTTPController(FlaskView):
         

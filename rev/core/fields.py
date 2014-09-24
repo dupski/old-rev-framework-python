@@ -23,13 +23,13 @@ class TextField(RevField):
 
 class SelectionField(RevField):
     def __init__(self, label, selection, **kwargs):
-        super(SelectionField, self).__init__(label, **kwargs)
+        super().__init__(label, **kwargs)
         self.selection = selection
 
 class MultiSelectionField(RevField):
 
     def __init__(self, label, selection, **kwargs):
-        super(MultiSelectionField, self).__init__(label, **kwargs)
+        super().__init__(label, **kwargs)
         self.selection = kwargs.get('selection', [])
     
     def validate_value(self, obj, name, value):
@@ -47,7 +47,7 @@ class DecimalField(RevField):
 
 class BooleanField(RevField):
     def __init__(self, *args, **kwargs):
-        super(BooleanField, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if self.default_value:
             self.default_value = True
         else:
@@ -59,6 +59,11 @@ class DateField(RevField):
 class DateTimeField(RevField):
     pass
 
+# Data Fielda
+
+class JSONField(RevField):
+    pass
+
 # Relational Fields
 
 class RecordLinkField(RevField):
@@ -68,7 +73,7 @@ class RecordLinkField(RevField):
     Use the 'multi' keyword argument to allow linking to multiple records
     """
     def __init__(self, label, related_model, **kwargs):
-        super(RecordLinkField, self).__init__(label, **kwargs)
+        super().__init__(label, **kwargs)
         self.related_model = related_model
         self.multi = kwargs.get('multi', False)
 
@@ -77,6 +82,6 @@ class RecordListField(RevField):
     Returns a list of related database records
     """
     def __init__(self, label, related_model, filter, **kwargs):
-        super(RecordListField, self).__init__(label, **kwargs)
+        super().__init__(label, **kwargs)
         self.related_model = related_model
         self.filter = filter

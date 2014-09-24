@@ -2,24 +2,30 @@
 from rev.core import models, fields
 from rev.core.translations import translate as _
 
-class RevActionType(models.RevModel):
+ACTION_TYPES = [
+    ('menu', _('Menu')),
+    ('model_view', _('Model View')),
+]
 
-    _description = 'Rev App UI Action Type'
-    
-    name = fields.TextField(_('Action Name'))
-    home_action = fields.RecordLinkField(_('Home Action'), 'RevAction')
-
-    _unique = ['name']
+MODEL_VIEW_TYPES = [
+    ('list', _('List View')),
+    ('form', _('Form View')),
+]
 
 class RevAction(models.RevModel):
 
     _description = 'Rev App UI Action'
     
-    module = fields.TextField(_('Module Name'))
     name = fields.TextField(_('Action Name'))
-    type = fields.RecordLinkField(_('Action Type'), 'RevActionType')
-    views = fields.RecordLinkField(_('Associated Views'), 'RevView', multi=True)
-    context = fields.TextField(_('Action Context'), required=False)
-    filter = fields.TextField(_('Action Data Filter'), required=False)
+    type = fields.SelectionField(_('Action Type'), ACTION_TYPES)
+    
+    # Fields for 'model_view' actions:
+    model = fields.TextField(_('Model Name'), required=False)
+    view_type = fields.MultiSelectionField(_('View Type List'), MODEL_VIEW_TYPES, required=False)
+    views = fields.RecordLinkField(_('Menu'), 'RevView', multi=True, required=False)
+    filter = fields.JSONField(_('Record Filter'), required=False)
+    
+    # Fields for 'menu' actions:
+    menu = fields.RecordLinkField(_('Menu'), 'RevMenu', required=False)
 
-    _unique = [('module', 'name')]
+    _unique = ['name']

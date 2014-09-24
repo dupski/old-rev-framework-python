@@ -1,6 +1,7 @@
 
 import rev
 from rev.core.models import RevModel
+from rev.core.moduledata import load_data
 from rev.core import fields
 from rev.core.translations import translate as _
 
@@ -142,13 +143,6 @@ class RevModule(RevModel):
         Returns True when done
         """
 
-        def _build_dep_str(mod_name):
-            # Return the full dependency path (e.g. revcrm_opportunity -> revcrm_base -> rev_base))
-            if not dependency_stack:
-                return mod_name
-            else:
-                return ' -> '.join(dependency_stack) + (', ' + mod_name) if mod_name else ''
-
         for mod in module_names:
             if mod in dependency_stack:
                 raise ValidationError("Circular Module Dependency Detected!: " + _build_dep_str(mod))
@@ -158,8 +152,12 @@ class RevModule(RevModel):
                 
         for mod in module_names:
             if mod not in mod_data:
-                raise ValidationError("Unknown Module '{}' required by '{}'".format(mod, _build_dep_str('')))
-            
+                if dependency_stack:
+                    raise ValidationError("Unknown Module '{}' required by '{}'".format(
+                                                mod, ' -> '.join(dependency_stack)))
+                else:
+                    raise ValidationError("Unknown Module '{}'".format(mod))
+                        
             if operation == 'install':
                 # If this module is not currently installed, install it!
                 if mod_data[mod]['status'] == 'not_installed':
@@ -181,8 +179,8 @@ class RevModule(RevModel):
                 
                 elif mod_data[mod]['status'] == 'installed':
                     self.update([mod_data[mod]['id']], {'status' : 'to_update'})
-                    # Make sure all modules that depend on this one are also scheduled for an update
-                    dep_mods = self.find({'depends' : mod}, read_fields=['name'])
+                    # Make sure all installed modules that depend on this one are also scheduled for an update
+                    dep_mods = self.find({'status' : 'installed', 'depends' : mod}, read_fields=['name'])
                     if dep_mods:
                         dstack = dependency_stack.copy()
                         dstack.append(mod)
@@ -276,7 +274,7 @@ class RevModule(RevModel):
                 
                 if has_models:
                     src_files = os.listdir(os.path.join(module_path, 'models'))
-                    src_files.sort() # make sure theres some kind of determinism for module loading!
+                    src_files.sort() # make sure theres some kind of determinism for module load order
                     
                     for src_file in src_files:
                         if src_file == '__init__.py' or src_file[-3:] != '.py':
@@ -338,8 +336,7 @@ class RevModule(RevModel):
                 mod_m.after_app_load(self.registry, mod_info[mod])
     
     def _update_data(self, mod_info, mod_path):
-        rev.log.info('Loading Module Data for '+mod_info['name'])
-        # TODO... that! :)...
+        load_data(mod_info, mod_path, self.registry)
         self.update([mod_info['id']], {
             'status' : 'installed',
             'db_version' : mod_info['module_version'],
@@ -356,4 +353,4 @@ class RevModule(RevModel):
         if inst_mods:
             raise ValidationError('One or more of the modules you are trying to remove is currently installed!')
         
-        return super(RevModule, self).delete(ids, context)
+        return super().delete(ids, context)
