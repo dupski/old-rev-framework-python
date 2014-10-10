@@ -286,7 +286,9 @@ class RevModule(RevModel):
                             if isinstance(cls, type) and issubclass(cls, RevModel):
     
                                 # Instantiate model and add to registry
-                                cls(self.registry)
+                                # TODO: Need to work out how inheritance is going to happen!
+                                mod_inst = cls(self.registry)
+                                self.registry.set(cls.__name__, mod_inst)
 
                 # Initialise the module's http controllers
                 if not rev.core.http.started:

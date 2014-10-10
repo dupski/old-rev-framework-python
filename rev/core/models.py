@@ -2,7 +2,7 @@
 import re
 import rev
 from rev.core.fields import RevField
-from rev.core.exceptions import ValidationError
+from rev.core.exceptions import ValidationError, ModelNotFoundError
 
 import pymongo
 from bson.objectid import ObjectId
@@ -27,9 +27,12 @@ class RevModelRegistry():
     
     def get(self, model_name):
         if (model_name not in self._models):
-            raise Exception("Model '{}' does not exist!".format(model_name))
+            raise ModelNotFoundError("Model '{}' does not exist!".format(model_name))
         else:
             return self._models[model_name]
+
+    def model_exists(self, model_name):
+        return True if model_name in self._models else False
     
     def validate(self):
         pass # TODO: Validate model registry, checking referential integrity, etc.
