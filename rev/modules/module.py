@@ -1,18 +1,16 @@
 
 import rev
-from rev.core.models import RevModel
-from rev.core.moduledata import load_data
-from rev.core import fields
-from rev.core.translations import translate as _
+from rev.db.models import RevModel
+from rev.db import fields
+from rev.i18n import translate as _
 
-from rev.core.exceptions import ValidationError
-import rev.core.http
-from rev.core.http import RevHTTPController
+from rev.db.exceptions import ValidationError
+from rev.http import RevHTTPController
 
 from toposort import toposort_flatten
 import importlib
 import os, sys
-import types
+import logging
 
 MODULE_STATUSES = [
     ('not_installed', _('Not Installed')),
@@ -21,6 +19,8 @@ MODULE_STATUSES = [
     ('to_update', _('To Be Updated')),
     ('to_remove', _('To Be Removed')),
 ]
+
+# Module Metadata container and business logic
 
 class RevModule(RevModel):
 
@@ -33,7 +33,6 @@ class RevModule(RevModel):
     db_version = fields.TextField(_('Installed Version'))
     status = fields.SelectionField(_('Status'), MODULE_STATUSES, default_value='not_installed')
     depends = fields.MultiSelectionField(_('Dependancies'), None, required=False)
-    auto_install = fields.BooleanField(_('Automatically Installed?'), required=False)
     
     _unique = ['name']
         
@@ -82,6 +81,76 @@ class RevModule(RevModel):
                 res.setdefault('removed_modules', []).append(mod['name'])
         
         return res
+
+    def get_scheduled_operations(self):
+        
+        ops = {
+            'to_install' : [],
+            'to_update' : [],
+            'to_remove' : [],
+        }
+        
+        op_modules = self.find({
+            'status' : {'$in' : ['to_install', 'to_update', 'to_remove']}
+        }, read_fields=['name','status'])
+        
+        for op in op_modules:
+            ops[op['status']].append(op['name'])
+        
+        return ops
+
+    def get_state_changes_needed(self, installed_modules):
+        """
+        Using the INSTALLED_MODULES setting, work out which modules should
+        be installed or can be removed.
+        """
+
+        ops = {
+            'install' : [],
+            'remove' : [],
+        }
+
+        # Find any modules in INSTALLED_MODULES that are not installed
+
+        mods_to_install = self.find({
+                'name' : {'$in' : installed_modules},
+                'status' : {'$nin' : ['installed', 'to_install', 'to_update']}
+            }, read_fields=['name','status'])
+                    
+        for op in mods_to_install:
+            ops['install'].append(op['name'])
+        
+        # Work out the list modules that are no longer needed
+        
+        mod_depend_info = self.find({
+                'status' : {'$in' : ['installed','to_install','to_update']}
+            },read_fields=['name','depends'])
+        
+        mod_depend_dict = {}
+        for mod in mod_depend_info:
+            mod_depend_dict[mod['name']] = {
+                'depends' : mod['depends'],
+                'required' : True if mod['name'] in installed_modules else False
+            }
+        
+        def tag_module_dependancies(mod_info):
+            for dep_mod in mod_info['depends']:
+                if dep_mod in mod_depend_dict:
+                    dep_mod_info = mod_depend_dict[dep_mod]
+                    if not dep_mod_info['required']:
+                        dep_mod_info['required'] = True
+                        tag_module_dependancies(dep_mod_info)
+
+        
+        for mod in installed_modules:
+            if mod in mod_depend_dict:
+                tag_module_dependancies(mod_depend_dict[mod])
+                        
+        for mod in mod_depend_dict.keys():
+            if not mod_depend_dict[mod]['required']:
+                ops['remove'].append(mod)
+        
+        return ops
     
     def _get_module_db_vals(self, module_name, module_info):
         """
@@ -95,7 +164,6 @@ class RevModule(RevModel):
             'module_description' : module_info.get('description', None),
             'module_version' : module_info.get('version', None),
             'depends' : module_info.get('depends', None),
-            'auto_install' : module_info.get('auto_install', False),
         }
     
     def _get_module_ids(self):
@@ -133,6 +201,11 @@ class RevModule(RevModel):
             if 'removed_modules' in module_changes and module_changes['removed_modules']:
                 del_ids = [db_ids[mod_name] for mod_name in module_changes['removed_modules']]
                 self.delete(del_ids)
+
+    def schedule_operations(self, operations_dict):
+        for op in ['remove','update','install']:
+            if op in operations_dict.keys():
+                self.schedule_operation(op, operations_dict[op])
     
     def schedule_operation(self, operation,  module_names, dependency_stack=[]):
         """
@@ -145,7 +218,8 @@ class RevModule(RevModel):
 
         for mod in module_names:
             if mod in dependency_stack:
-                raise ValidationError("Circular Module Dependency Detected!: " + _build_dep_str(mod))
+                raise ValidationError("Circular Module Dependency Detected for module '{}': {}".format(
+                                                mod, ' -> '.join(dependency_stack)))
         
         mod_data = self.find({'name' : {'$in' : module_names}}, read_fields='*')
         mod_data = dict( [(mod['name'], mod) for mod in mod_data] )
@@ -162,6 +236,8 @@ class RevModule(RevModel):
                 # If this module is not currently installed, install it!
                 if mod_data[mod]['status'] == 'not_installed':
                     self.update([mod_data[mod]['id']], {'status' : 'to_install'})
+                elif mod_data[mod]['status'] == 'to_remove':
+                    self.update([mod_data[mod]['id']], {'status' : 'installed'})
                 # Make sure all current dependencies are installed as well
                 if mod_data[mod]['depends']:
                     dstack = dependency_stack.copy()
@@ -221,24 +297,28 @@ class RevModule(RevModel):
         if mod_ids['to_remove']:
             self.update(mod_ids['to_remove'], {'status' : 'installed'})
                         
-    def install_and_load(self):
+    def load_modules(self, do_operations=False):
         """
         Loads the module hierarchy. If any modules are set to be installed /
-        upgraded / removed, do that too!
+        upgraded / removed, do that too if do_operations=True
         """
         
-        # Do module removals first
-        mods_to_remove = self.find({'status' : 'to_remove'}, read_fields='*')
-        if mods_to_remove:
-            mods_to_sort = {}
-            for mod in mods_to_remove:
-                mods_to_sort[mod['name']] = set(mod['depends'])
-            mod_remove_order = toposort_flatten(mods_to_sort)
-            mod_remove_order.reverse()
-            for mod in mod_remove_order:
-                self._remove_data(mod)
+        if do_operations:
+            # Do module removals first
+            mods_to_remove = self.find({'status' : 'to_remove'}, read_fields='*')
+            if mods_to_remove:
+                mods_to_sort = {}
+                removed_mod_info = {}
+                for mod in mods_to_remove:
+                    mods_to_sort[mod['name']] = set(mod['depends'])
+                    removed_mod_info[mod['name']] = mod
+                mod_remove_order = toposort_flatten(mods_to_sort)
+                mod_remove_order.reverse()
+                for mod in mod_remove_order:
+                    if mod in removed_mod_info:
+                        self._remove_data(removed_mod_info[mod])
   
-        # Install and load modules
+        # load modules
         mods_to_sort = {}
         mod_info = {}
         mod_load_order = []
@@ -254,7 +334,7 @@ class RevModule(RevModel):
             
             for mod in mod_load_order:
                 
-                rev.log.info('Loading Module: '+mod)
+                logging.info('Loading Module: '+mod)
                 
                 # Import the module
                 mod_m = importlib.import_module(mod)
@@ -291,40 +371,39 @@ class RevModule(RevModel):
                                 self.registry.set(cls.__name__, mod_inst)
 
                 # Initialise the module's http controllers
-                if not rev.core.http.started:
-                    has_http = False
-                    try:
-                        m = importlib.import_module(mod+'.controllers')
-                        has_http = True
-                    except ImportError:
-                        pass
-                    
-                    if has_http:
-                        src_files = os.listdir(os.path.join(module_path, 'controllers'))
-                        src_files.sort()
-                        
-                        for src_file in src_files:
-                            if src_file == '__init__.py' or src_file[-3:] != '.py':
-                                continue
-                            m = importlib.import_module(mod+'.controllers.'+src_file[:-3])
-                            
-                            for msymbol in dir(m):
-                                cls = getattr(m, msymbol)
-                                if isinstance(cls, type) and cls is not RevHTTPController and issubclass(cls, RevHTTPController):
-                                    
-                                    rev.log.debug("Registering HTTP Controller: " + cls.__name__)
-                                    cls.register(rev.core.http.http_app)
+                has_http = False
+                try:
+                    m = importlib.import_module(mod+'.controllers')
+                    has_http = True
+                except ImportError:
+                    pass
                 
-                    # Register template path if the module has a 'templates' folder
-                    template_path = os.path.join(module_path, 'templates')
-                    if os.path.isdir(template_path):
-                        rev.core.http.register_template_path(template_path)
+                if has_http:
+                    src_files = os.listdir(os.path.join(module_path, 'controllers'))
+                    src_files.sort()
+                    
+                    for src_file in src_files:
+                        if src_file == '__init__.py' or src_file[-3:] != '.py':
+                            continue
+                        m = importlib.import_module(mod+'.controllers.'+src_file[:-3])
+                        
+                        for msymbol in dir(m):
+                            cls = getattr(m, msymbol)
+                            if isinstance(cls, type) and cls is not RevHTTPController and issubclass(cls, RevHTTPController):
+                                
+                                logging.debug("Registering HTTP Controller: " + cls.__name__)
+                                cls.register(self.registry.app)
+            
+                # Register template path if the module has a 'templates' folder
+                template_path = os.path.join(module_path, 'templates')
+                if os.path.isdir(template_path):
+                    self.registry.app.register_template_path(template_path)
 
                 # Run the after-model-load hook (if applicable)
                 if getattr(mod_m, 'after_model_load', False):
                     mod_m.after_model_load(self.registry, mod_info[mod])
                                         
-                if mod_info[mod]['status'] != 'installed':
+                if mod_info[mod]['status'] != 'installed' and do_operations:
                     self._update_data(mod_info[mod], module_path)
     
                     # Run the after-data-load hook (if applicable)
@@ -338,14 +417,18 @@ class RevModule(RevModel):
                 mod_m.after_app_load(self.registry, mod_info[mod])
     
     def _update_data(self, mod_info, mod_path):
+        from .loader import load_data
         load_data(mod_info, mod_path, self.registry)
         self.update([mod_info['id']], {
             'status' : 'installed',
             'db_version' : mod_info['module_version'],
         })
     
-    def _remove_data(self, module_record):
-        print('TODO: Remove data for module: ', module_record['name'])
+    def _remove_data(self, mod_info):
+        print('TODO: Remove data for module: ', mod_info['name'])
+        self.update([mod_info['id']], {
+            'status' : 'not_installed',
+        })
     
     def delete(self, ids, context={}):
         """

@@ -1,5 +1,5 @@
 
-from rev.core.exceptions import ValidationError
+from .exceptions import ValidationError
 
 class RevField():
     

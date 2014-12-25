@@ -1,6 +1,6 @@
 
-from rev.core import models, fields
-from rev.core.translations import translate as _
+from rev.db import models, fields
+from rev.i18n import translate as _
 
 class RevUser(models.RevModel):
 

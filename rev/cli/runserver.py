@@ -40,5 +40,17 @@ import logging
 
 class RunServerCommand(BaseCommand):
     def run(self, app, args, **kwargs):
-        print('wooo!')
-        logging.debug("Starting RevFramework App '{}' on {}:{} ...".format(app.name, args.ipaddress, args.port))
+
+        from rev import PKG_NAME, PKG_VERSION
+
+        logging.info('{} v{}'.format(PKG_NAME, PKG_VERSION))
+
+        logging.info("Starting Rev App '{}' ...".format(app.name))
+        
+        app.init()
+        
+        app.run(
+            host=args.ipaddress,
+            port=args.port,
+            debug=True,
+            use_reloader=False)

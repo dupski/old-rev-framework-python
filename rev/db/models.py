@@ -1,24 +1,16 @@
 
 import re
-import rev
-from rev.core.fields import RevField
-from rev.core.exceptions import ValidationError, ModelNotFoundError
 
-import pymongo
-from bson.objectid import ObjectId
+from rev.db.fields import RevField
+from rev.db.exceptions import ValidationError, ModelNotFoundError
 
-ORDER_BY_OPTIONS = {
-    'asc' : pymongo.ASCENDING,
-    'desc' : pymongo.DESCENDING,
-}
-
-# We currently support just one model registry
-registry = None
+import logging
 
 class RevModelRegistry():
     
-    def __init__(self, db):
+    def __init__(self, app, db):
         
+        self.app = app
         self.db = db
         self._models = {}
     
@@ -41,7 +33,7 @@ class RevModel():
     
     def __init__(self, registry):
         
-        db = registry.db
+        self.registry = registry
         
         self._name = self.__class__.__name__
         self._module = self.__class__.__module__
@@ -49,7 +41,7 @@ class RevModel():
         if not self._description:
             raise Exception('Rev Models must have a _description properties defined!');
 
-        rev.log.info('Loading Model: %s (%s)', self._name, self._description)
+        logging.info('Loading Model: %s (%s)', self._name, self._description)
     
         self.registry = registry
         
@@ -58,69 +50,22 @@ class RevModel():
         self._table_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', self._table_name).lower()
         self._table_name.replace('__', '_')
         
+        # configure self._fields
         self._fields = {}
         for attr in dir(self):
             if isinstance(getattr(self, attr), RevField):
                 self._fields[attr] = getattr(self, attr)
         
-        if self._table_name not in db.collection_names():
-            rev.log.info('Creating Collection: %s', self._table_name)
-            db.create_collection(self._table_name)
-        
-        if hasattr(self, '_unique'):
-            for unq_key in self._unique:
-                if unq_key:
-                    rev.log.debug('Ensuring Unique Constraint for: %s', unq_key)
-                    if isinstance(unq_key, str):
-                        db[self._table_name].ensure_index(unq_key, unique=True )
-                    elif isinstance(unq_key, (list, tuple)):
-                        index_spec = []
-                        for unq_field in unq_key:
-                            index_spec.append((unq_field, pymongo.ASCENDING))
-                        db[self._table_name].ensure_index(index_spec, unique=True )
+        # initialise model in database #TODO: This should really be done via syncdb
+        self.registry.db.init_model(self)
     
     def find(self, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
         Search the database using the specified criteria, and return the matching data
         """
-
-        if 'id' in criteria:
-            # replace 'id' with '_id' and also convert the string values to BSON ObjectIds
-            if isinstance(criteria['id'], str):
-                criteria['_id'] = ObjectId(criteria['id'])
-            elif isinstance(criteria['id'], dict) and isinstance(criteria['id'].get('$in'), list):
-                criteria['_id'] = {'$in' : [ObjectId(x) for x in criteria['id']['$in']]}
-
-            del criteria['id']
-        
-        if count_only:
-            read_fields = []
-            order_by = None
-            limit = None
-            offset = None
-        else:
-            if read_fields == '*':
-                # Make sure we read all fields then
-                read_fields = None
-            if order_by:
-                # Replace asc / desc with db value
-                for ob_key, ob_val in enumerate(order_by):
-                    ob_val[1] = ORDER_BY_OPTIONS[ob_val[1]]
         
         db = self.registry.db
-        cr = db[self._table_name].find(spec=criteria, fields=read_fields, sort=order_by, limit=limit, skip=offset)
-        
-        if count_only:
-            return cr.count()
-        else:
-            res = []
-            for rec in cr:
-                if rec['_id']:
-                    rec['id'] = str(rec['_id'])
-                    del rec['_id']
-                #TODO: Process function fields, etc.
-                res.append(rec)
-            return res
+        return db.find(self, criteria, read_fields, order_by, limit, offset, count_only, context)
     
     def validate_field_values(self, vals):
         """
@@ -155,7 +100,7 @@ class RevModel():
         
         # Do Create
         db = self.registry.db
-        id = db[self._table_name].insert(create_vals)
+        id = db.create(self, create_vals, context)
         
         return id        
 
@@ -165,14 +110,10 @@ class RevModel():
         """
                 
         self.validate_field_values(vals)
-
-        id_list = []
-        for id in ids:
-            id_list.append(ObjectId(id))
         
         # Do Update
         db = self.registry.db
-        res = db[self._table_name].update({'_id' : {'$in' : id_list}}, {'$set' : vals}, multi=True)
+        res = db.update(self, ids, vals, context)
         
         return True
     
@@ -180,11 +121,9 @@ class RevModel():
         """
         Deletes existing records. Returns True if successful
         """
-
-        id_list = []
-        for id in ids:
-            id_list.append(ObjectId(id))
         
         # Do Delete
         db = self.registry.db
-        res = db[self._table_name].remove({'_id' : {'$in' : id_list}}, multi=True)
+        res = db.delete(self, id_list, context)
+        
+        return True
