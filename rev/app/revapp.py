@@ -27,6 +27,7 @@ class RevApp(Flask):
         # Initialise instance variables
         self.registry = None
         self.template_paths = []
+        self.module_info = {}
                 
         # Load settings module into self.settings
         self.name = app_name

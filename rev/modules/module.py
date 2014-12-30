@@ -340,6 +340,10 @@ class RevModule(RevModel):
                 mod_m = importlib.import_module(mod)
                 module_path = mod_m.__path__[0]
                 
+                # Store module metadata in app.modules
+                self.registry.app.module_info[mod] = mod_info[mod]
+                self.registry.app.module_info[mod]['module_path'] = module_path
+                
                 # Run the before-model-load hook (if applicable)
                 if getattr(mod_m, 'before_model_load', False):
                     mod_m.before_model_load(self.registry, mod_info[mod])
