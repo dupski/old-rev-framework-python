@@ -19,7 +19,24 @@ class RevField():
 # Plain Value Fields
 
 class TextField(RevField):
-    pass
+    def __init__(self, label, multiline=False, **kwargs):
+        super().__init__(label, **kwargs)
+        self.multiline = multiline
+
+class EmailAddressField(TextField):
+    def __init__(self, label, **kwargs):
+        super().__init__(label, **kwargs)
+        self.multiline = False
+
+class PhoneNumberField(TextField):
+    def __init__(self, label, **kwargs):
+        super().__init__(label, **kwargs)
+        self.multiline = False
+
+class URLField(TextField):
+    def __init__(self, label, **kwargs):
+        super().__init__(label, **kwargs)
+        self.multiline = False
 
 class SelectionField(RevField):
     def __init__(self, label, selection, **kwargs):
