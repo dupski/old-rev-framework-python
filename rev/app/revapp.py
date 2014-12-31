@@ -8,6 +8,7 @@ import sys
 
 from rev.db.models import RevModelRegistry
 from rev.modules.module import RevModule
+from rev.modules.staticfiles import StaticFiles, StaticFilesEndpoint
 
 # Main RevFramework Application object
 
@@ -26,8 +27,10 @@ class RevApp(Flask):
 
         # Initialise instance variables
         self.registry = None
+        self.staticfiles = None
         self.template_paths = []
         self.module_info = {}
+        self.module_load_order = []
                 
         # Load settings module into self.settings
         self.name = app_name
@@ -37,7 +40,7 @@ class RevApp(Flask):
                 self.settings[setting] = getattr(settings, setting)
         
         # Hardcode the flask import_name to 'rev'. Template and static file paths are sorted out later.
-        return super().__init__('rev', *args, **kwargs)
+        return super().__init__('rev', *args, static_folder=None, **kwargs)
 
     def register_template_path(self, template_path):
         self.template_paths.append(template_path)
@@ -134,6 +137,13 @@ class RevApp(Flask):
         module_obj.load_modules(do_operations=syncdb)
         
         if not syncdb:
+            
+            # initialise model registry
+            self.registry = RevModelRegistry(self, db_prov)
+            
+            # initialise static files class
+            self.staticfiles = StaticFiles(self)
+            StaticFilesEndpoint.register(self)
             
             # configure jinja template paths
             template_loaders = [self.jinja_loader]

@@ -331,6 +331,7 @@ class RevModule(RevModel):
                 mod_info[mod['name']] = mod
             
             mod_load_order = toposort_flatten(mods_to_sort)
+            self.registry.app.module_load_order = mod_load_order
             
             for mod in mod_load_order:
                 
