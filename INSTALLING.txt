@@ -9,7 +9,14 @@ RevFramework Installation Instructions for Ubuntu
 
 2. Install required python packages using the supplied REQUIRES.TXT
 
- pip install -r REQUIRES.TXT 
+ pip install -r REQUIRES.TXT
+
+NOTE: The following system packages may need to be installed for lxml:
+
+ python3-dev
+ libxml2-dev
+ libxslt1-dev
+ zlib1g-dev
 
 3. Install MongoDB
 

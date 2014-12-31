@@ -347,7 +347,7 @@ class RevModule(RevModel):
                 
                 # Run the before-model-load hook (if applicable)
                 if getattr(mod_m, 'before_model_load', False):
-                    mod_m.before_model_load(self.registry, mod_info[mod])
+                    mod_m.before_model_load(self.registry.app, mod_info[mod])
                 
                 # Import the module's models (if present)
                 has_models = False
@@ -406,20 +406,20 @@ class RevModule(RevModel):
 
                 # Run the after-model-load hook (if applicable)
                 if getattr(mod_m, 'after_model_load', False):
-                    mod_m.after_model_load(self.registry, mod_info[mod])
+                    mod_m.after_model_load(self.registry.app, mod_info[mod])
                                         
                 if mod_info[mod]['status'] != 'installed' and do_operations:
                     self._update_data(mod_info[mod], module_path)
     
                     # Run the after-data-load hook (if applicable)
                     if getattr(mod_m, 'after_data_load', False):
-                        mod_m.after_data_load(self.registry, mod_info[mod])
+                        mod_m.after_data_load(self.registry.app, mod_info[mod])
         
         # Run the after-app-load hook for all modules (if applicable)
         for mod in mod_load_order:
             mod_m = sys.modules[mod]
             if getattr(mod_m, 'after_app_load', False):
-                mod_m.after_app_load(self.registry, mod_info[mod])
+                mod_m.after_app_load(self.registry.app, mod_info[mod])
     
     def _update_data(self, mod_info, mod_path):
         from .loader import load_data
