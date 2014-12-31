@@ -5,7 +5,5 @@ class RevAppHTTPController(RevHTTPController):
     route_base = '/'
 
     def index(self):
-        return self.render_template('base.html')
-    
-    def mytest(self):
-        return "self = " + str(dir(self))
+        app = self._app        
+        return self._render_template('index.html', app=app)

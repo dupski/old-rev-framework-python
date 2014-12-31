@@ -1,0 +1,6 @@
+
+/* Collapsed navbar - use full screen height */
+
+.navbar-fixed-top .navbar-collapse {
+	max-height: none;
+}
