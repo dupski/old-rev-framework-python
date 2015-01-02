@@ -1,8 +1,7 @@
 <?xml version="1.0"?>
 <rev>
-	<rev-flibble />
 
-	<rev-view id="app_nav" model="RevApp" type="form" name="Rev App Navbar Template">
+	<rev-view id="app_navbar" model="RevApp" type="form" name="Rev App Navbar Template">
 		
 		<nav class="navbar navbar-default navbar-fixed-top" role="navigation">
 		  <div class="container-fluid">
@@ -24,7 +23,7 @@
 		        <li><a href="#">Link</a></li>
 		        <li class="dropdown" dropdown="true">
 		          <a href="#" class="dropdown-toggle" dropdown-toggle="true" role="button">Dropdown <span class="caret"></span></a>
-		          <ul class="dropdown-menu" role="menu">
+		          <ul class="dropdown-menu" role="menu" name="mainmenu">
 		            <li><a href="#">Action</a></li>
 		            <li><a href="#">Another action</a></li>
 		            <li><a href="#">Something else here</a></li>
@@ -47,7 +46,7 @@
 		          <a href="#" class="dropdown-toggle" dropdown-toggle="true" role="button">Dropdown <span class="caret"></span></a>
 		          <ul class="dropdown-menu" role="menu">
 		            <li><a href="#">Action</a></li>
-		            <li><a href="#">Another action</a></li>
+		            <li><a href="#">Another action 2</a></li>
 		            <li><a href="#">Something else here</a></li>
 		            <li class="divider"></li>
 		            <li><a href="#">Separated link</a></li>
@@ -75,6 +74,10 @@
 			
 			</div>
 		</div>
+		
+		<p>Para 1</p>
+
+		<p>Para 2</p>
 	
 	</rev-view>
 	
