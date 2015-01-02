@@ -57,6 +57,12 @@
 		  </div><!-- /.container-fluid -->
 		</nav>
 		
+		<p>test 1</p>
+
+		<p>test 2</p>
+
+		<p>test 3</p>
+		
 	</rev-view>
 	
 	<rev-view id="app_main_content" model="RevApp" type="form" name="Rev App Main Content Template">

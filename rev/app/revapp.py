@@ -47,7 +47,7 @@ class RevApp(Flask):
     
     def init(self, syncdb=False):
         """
-        Initialiseconfiguration, database and installed modules
+        Initialise configuration, database and installed modules
         """
         
         # intialise default database
@@ -151,6 +151,11 @@ class RevApp(Flask):
                 template_loaders.append(FileSystemLoader(template_path))
             template_loaders.reverse() # Last imported module should take precedence
             self.jinja_loader = ChoiceLoader(template_loaders)
+            
+            # set up jinja2 global context
+            @self.context_processor
+            def jinja_global_context():
+                return {'app' : self}
             
             # log endpoints
             logging.debug('Registered HTTP Endpoints:')
