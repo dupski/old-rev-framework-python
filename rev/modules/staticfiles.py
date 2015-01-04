@@ -4,7 +4,7 @@
 import os
 from copy import copy
 
-from flask import send_from_directory, abort
+from flask import send_from_directory, abort, current_app
 from flask.ext.classy import route
 from rev.http import RevHTTPController
 
@@ -54,7 +54,7 @@ class StaticFilesEndpoint(RevHTTPController):
  
     @route('/static/<path:file_url>')
     def static_file(self, file_url):
-        filepath = self._app.staticfiles.find(file_url)
+        filepath = current_app.staticfiles.find(file_url)
         if filepath:
             #logging.debug("Serving '{}' from '{}'".format(file_url, filepath))
             filedir, filename = os.path.split(filepath)

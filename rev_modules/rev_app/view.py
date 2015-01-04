@@ -7,6 +7,7 @@ from io import StringIO
 
 MODIFY_ACTIONS = ['insert_before','insert_after','insert_inside','replace','remove']
 
+
 def do_view_modification(target_view, modify_xml, modify_xml_path):
     """
     Performs the requested <modify> operation specified in modify_xml to the target_view
@@ -23,7 +24,7 @@ def do_view_modification(target_view, modify_xml, modify_xml_path):
             return
     
     xmldata = StringIO('<rev-view>' + target_view['view'] + '</rev-view>')
-    tree = etree.parse(xmldata)
+    tree = etree.parse(xmldata, parser=get_parser())
     
     matches = []
     try:
@@ -93,7 +94,7 @@ def load_views(app):
                     
                     xmltree = None
                     try:
-                        xmltree = etree.parse(xml_path)
+                        xmltree = etree.parse(xml_path, parser=get_parser())
                     except Exception as e:
                         logging.error("Error loading {}: {}".format(xml_path, e))
                         continue
@@ -101,6 +102,8 @@ def load_views(app):
                     root = xmltree.getroot()
                     
                     for elem in root:
+                        if elem.tag is etree.Comment:
+                            continue
                         if elem.tag != 'rev-view':
                             logging.error("Error on line {} of {}: Unexpected element '{}'.".format(elem.sourceline, xml_path, elem.tag))
                             continue
@@ -138,6 +141,8 @@ def load_views(app):
                             target_view = views[view_id[0]][view_id[1]]
                             
                             for node in elem:
+                                if node.tag is etree.Comment:
+                                    continue
                                 if node.tag != 'modify':
                                     logging.error("Error on line {} of {}: Unexpected element '{}'.".format(elem.sourceline, xml_path, elem.tag))
                                     continue
@@ -162,9 +167,25 @@ def load_views(app):
 from flask import current_app
 from jinja2.utils import Markup
 
-def rev_view(view_id):
+def get_view(module_name, view_name):
     """
-    Renders and returns the HTML for the specified rev_view
+    Lookup the specified rev-view, and returned the rendered HTML
+    """
+    app = current_app
+    
+    if module_name not in app.views or view_name not in app.views[module_name]:
+        return None
+    
+    view_html = app.views[module_name][view_name]['view']
+    view_template = app.jinja_env.from_string(view_html)
+    context = {}
+    app.update_template_context(context)
+    
+    return view_template.render(context)
+
+def rev_view_jinja_fn(view_id):
+    """
+    rev_view() function for jinja2 that inserts a rendered rev-view
     view_id should be in the format <module>.<view_id>
     """
     view_id_str = str(view_id)
@@ -172,14 +193,8 @@ def rev_view(view_id):
     if len(view_id) != 2:
         raise Exception("Invalid view_id specified for rev_view(). Should be in the format <module>.<view_id>.")
 
-    app = current_app
+    rendered_html = get_view(view_id[0], view_id[1])
+    if rendered_html is None:
+        raise Exception("Could not find the specified rev-view: '{}'".format(view_id_str))
     
-    if view_id[0] not in app.views or view_id[1] not in app.views[view_id[0]]:
-        raise Exception("Could not find the view specified for rev_view(): '{}'".format(view_id_str))
-    
-    view_html = app.views[view_id[0]][view_id[1]]['view']
-    view_template = app.jinja_env.from_string(view_html)
-    context = {}
-    app.update_template_context(context)
-    
-    return Markup(view_template.render(context))
+    return Markup(rendered_html)

@@ -1,7 +1,7 @@
 
 from .exceptions import ValidationError
 
-class RevField():
+class Field():
     
     def __init__(self, label, **kwargs):
         self.label = label
@@ -16,9 +16,14 @@ class RevField():
         if self.required and not value:
             raise ValidationError("Field '{}' on object '{}' is required!".format(name, obj._name))
 
+# Primary Key Field
+
+class RecordIDField(Field):
+    pass
+
 # Plain Value Fields
 
-class TextField(RevField):
+class TextField(Field):
     def __init__(self, label, multiline=False, **kwargs):
         super().__init__(label, **kwargs)
         self.multiline = multiline
@@ -38,12 +43,12 @@ class URLField(TextField):
         super().__init__(label, **kwargs)
         self.multiline = False
 
-class SelectionField(RevField):
+class SelectionField(Field):
     def __init__(self, label, selection, **kwargs):
         super().__init__(label, **kwargs)
         self.selection = selection
 
-class MultiSelectionField(RevField):
+class MultiSelectionField(Field):
 
     def __init__(self, label, selection, **kwargs):
         super().__init__(label, **kwargs)
@@ -53,16 +58,16 @@ class MultiSelectionField(RevField):
         if not isinstance(value, list):
             raise ValidationError("Invalid value for multi-select field '{}' of object '{}'!".format(name, obj._name))
 
-class IntegerField(RevField):
+class IntegerField(Field):
     pass
 
-class FloatField(RevField):
+class FloatField(Field):
     pass
 
-class DecimalField(RevField):
+class DecimalField(Field):
     pass
 
-class BooleanField(RevField):
+class BooleanField(Field):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.default_value:
@@ -70,20 +75,20 @@ class BooleanField(RevField):
         else:
             self.default_value = False
 
-class DateField(RevField):
+class DateField(Field):
     pass
 
-class DateTimeField(RevField):
+class DateTimeField(Field):
     pass
 
 # Data Fielda
 
-class JSONField(RevField):
+class JSONField(Field):
     pass
 
 # Relational Fields
 
-class RecordLinkField(RevField):
+class RecordLinkField(Field):
     """
     Stores links to one or more related records
     
@@ -94,9 +99,9 @@ class RecordLinkField(RevField):
         self.related_model = related_model
         self.multi = kwargs.get('multi', False)
 
-class RecordListField(RevField):
+class RecordListField(Field):
     """
-    Returns a list of related database records
+    Returns a list of related records
     """
     def __init__(self, label, related_model, filter, **kwargs):
         super().__init__(label, **kwargs)

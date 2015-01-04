@@ -1,13 +1,14 @@
 
-from rev.db import models, fields
+from . import MetadataModel
+from rev.models import fields
 from rev.i18n import translate as _
 
-class RevMenu(models.RevModel):
+class Menu(MetadataModel):
 
     _description = 'Rev App UI Menu'
     
     name = fields.TextField(_('Menu Name'))
-    parent = fields.RecordLinkField(_('Parent Menu'), 'RevMenu')
-    action = fields.RecordLinkField(_('Action'), 'RevAction', required=False)
+    parent = fields.RecordLinkField(_('Parent Menu'), 'Menu', required=False)
+    action = fields.RecordLinkField(_('Action'), 'Action', required=False)
     icon = fields.TextField(_('Menu Icon'), required=False)
     sequence = fields.IntegerField(_('Menu Sequence'))

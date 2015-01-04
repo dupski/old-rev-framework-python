@@ -1,5 +1,6 @@
 
-from rev.db import models, fields
+from . import MetadataModel
+from rev.models import fields
 from rev.i18n import translate as _
 
 ACTION_TYPES = [
@@ -12,11 +13,11 @@ MODEL_VIEW_TYPES = [
     ('form', _('Form View')),
 ]
 
-class RevView(models.RevModel):
+class View(MetadataModel):
 
     _description = 'Rev App UI Action'
     
     name = fields.TextField(_('View Name'))
-    type = fields.SelectionField(_('View Type'), MODEL_VIEW_TYPES)
-    model = fields.TextField(_('Model Name'), required=True)
+    type = fields.SelectionField(_('View Type'), MODEL_VIEW_TYPES, required=False)
+    model = fields.TextField(_('Model Name'), required=False)
     

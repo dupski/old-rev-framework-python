@@ -1,10 +1,10 @@
 
 import rev
-from rev.db.models import RevModel
-from rev.db import fields
+from rev.db.models import DBModel
+from rev.models import Model, InMemoryModel, fields
 from rev.i18n import translate as _
 
-from rev.db.exceptions import ValidationError
+from rev.models.exceptions import ValidationError
 from rev.http import RevHTTPController
 
 from toposort import toposort_flatten
@@ -22,7 +22,7 @@ MODULE_STATUSES = [
 
 # Module Metadata container and business logic
 
-class RevModule(RevModel):
+class Module(DBModel):
 
     _description = 'Rev Module Information'
     
@@ -116,7 +116,7 @@ class RevModule(RevModel):
                 'name' : {'$in' : installed_modules},
                 'status' : {'$nin' : ['installed', 'to_install', 'to_update']}
             }, read_fields=['name','status'])
-                    
+        
         for op in mods_to_install:
             ops['install'].append(op['name'])
         
@@ -125,7 +125,7 @@ class RevModule(RevModel):
         mod_depend_info = self.find({
                 'status' : {'$in' : ['installed','to_install','to_update']}
             },read_fields=['name','depends'])
-        
+
         mod_depend_dict = {}
         for mod in mod_depend_info:
             mod_depend_dict[mod['name']] = {
@@ -165,17 +165,7 @@ class RevModule(RevModel):
             'module_version' : module_info.get('version', None),
             'depends' : module_info.get('depends', None),
         }
-    
-    def _get_module_ids(self):
-        """
-        Return dictionary mapping module names to database ids
-        """
-        mod_list = self.find({}, read_fields=['name'])
-        res = {}
-        for mod in mod_list:
-            res[mod['name']] = mod['id']
-        return res
-         
+             
     def update_module_metadata(self, available_modules):
         """
         Takes a dictionary of module information and updates the
@@ -185,7 +175,6 @@ class RevModule(RevModel):
         module_changes = self.get_module_metadata_changes(available_modules)
         
         if module_changes:
-            db_ids = self._get_module_ids()
             
             if 'new_modules'in module_changes:
                 for mod_name in module_changes['new_modules']:
@@ -196,11 +185,11 @@ class RevModule(RevModel):
             if 'changed_modules' in module_changes:
                 for mod_name in module_changes['changed_modules']:
                     mod_vals = self._get_module_db_vals(mod_name, available_modules[mod_name])
-                    self.update([db_ids[mod_name]], mod_vals)
+                    self.update({'name' : mod_name}, mod_vals)
             
             if 'removed_modules' in module_changes and module_changes['removed_modules']:
                 del_ids = [db_ids[mod_name] for mod_name in module_changes['removed_modules']]
-                self.delete(del_ids)
+                self.delete({'id':{'$in':del_ids}})
 
     def schedule_operations(self, operations_dict):
         for op in ['remove','update','install']:
@@ -235,9 +224,9 @@ class RevModule(RevModel):
             if operation == 'install':
                 # If this module is not currently installed, install it!
                 if mod_data[mod]['status'] == 'not_installed':
-                    self.update([mod_data[mod]['id']], {'status' : 'to_install'})
+                    self.update({'name':mod_data[mod]['name']}, {'status' : 'to_install'})
                 elif mod_data[mod]['status'] == 'to_remove':
-                    self.update([mod_data[mod]['id']], {'status' : 'installed'})
+                    self.update({'name':mod_data[mod]['name']}, {'status' : 'installed'})
                 # Make sure all current dependencies are installed as well
                 if mod_data[mod]['depends']:
                     dstack = dependency_stack.copy()
@@ -247,14 +236,14 @@ class RevModule(RevModel):
             elif operation == 'update':
                 # if this module is not installed, then we should install it
                 if mod_data[mod]['status'] == 'not_installed':
-                    self.update([mod_data[mod]['id']], {'status' : 'to_install'})
+                    self.update({'name':mod_data[mod]['name']}, {'status' : 'to_install'})
                     # Make sure all current dependencies are installed as well
                     # (only do this if it was not installed)
                     if mod_data[mod]['depends']:
                         self.schedule_operation('install', mod_data[mod]['depends'], [])
                 
                 elif mod_data[mod]['status'] == 'installed':
-                    self.update([mod_data[mod]['id']], {'status' : 'to_update'})
+                    self.update({'name':mod_data[mod]['name']}, {'status' : 'to_update'})
                     # Make sure all installed modules that depend on this one are also scheduled for an update
                     dep_mods = self.find({'status' : 'installed', 'depends' : mod}, read_fields=['name'])
                     if dep_mods:
@@ -265,10 +254,10 @@ class RevModule(RevModel):
             elif operation == 'remove':
                 # If this module is scheduled for install, then just cancel that
                 if mod_data[mod]['status'] == 'to_install':
-                    self.update([mod_data[mod]['id']], {'status' : 'not_installed'})
+                    self.update({'name':mod_data[mod]['name']}, {'status' : 'not_installed'})
                 # otherwise mark it for removal, as appropriate
                 elif mod_data[mod]['status'] not in ['not_installed', 'to_remove']:
-                    self.update([mod_data[mod]['id']], {'status' : 'to_remove'})
+                    self.update({'name':mod_data[mod]['name']}, {'status' : 'to_remove'})
                     # Also make sure any modules that depend on this one are scheduled for removal too
                     dep_mods = self.find({'depends' : mod}, read_fields=['name'])
                     if dep_mods:
@@ -289,21 +278,21 @@ class RevModule(RevModel):
             'to_remove' : [],
         }
         for mod in mods:
-            mod_ids[mod['status']].append(mod['id'])
+            mod_ids[mod['status']].append(mod['name'])
         if mod_ids['to_install']:
-            self.update(mod_ids['to_install'], {'status' : 'not_installed'})
+            self.update({'name':{'$in':mod_ids['to_install']}}, {'status' : 'not_installed'})
         if mod_ids['to_update']:
-            self.update(mod_ids['to_update'], {'status' : 'installed'})
+            self.update({'name':{'$in':mod_ids['to_update']}}, {'status' : 'installed'})
         if mod_ids['to_remove']:
-            self.update(mod_ids['to_remove'], {'status' : 'installed'})
+            self.update({'name':{'$in':mod_ids['to_remove']}}, {'status' : 'installed'})
                         
-    def load_modules(self, do_operations=False):
+    def load_modules(self, syncdb=False):
         """
         Loads the module hierarchy. If any modules are set to be installed /
         upgraded / removed, do that too if do_operations=True
         """
         
-        if do_operations:
+        if syncdb:
             # Do module removals first
             mods_to_remove = self.find({'status' : 'to_remove'}, read_fields='*')
             if mods_to_remove:
@@ -316,7 +305,7 @@ class RevModule(RevModel):
                 mod_remove_order.reverse()
                 for mod in mod_remove_order:
                     if mod in removed_mod_info:
-                        self._remove_data(removed_mod_info[mod])
+                        self.remove_module_data(removed_mod_info[mod])
   
         # load modules
         mods_to_sort = {}
@@ -324,114 +313,128 @@ class RevModule(RevModel):
         mod_load_order = []
 
         mods_to_load = self.find({'status' : {'$in' : ['installed','to_install','to_update']}}, read_fields='*')
-        if mods_to_load:
             
-            for mod in mods_to_load:
-                mods_to_sort[mod['name']] = set(mod['depends'])
-                mod_info[mod['name']] = mod
-            
-            mod_load_order = toposort_flatten(mods_to_sort)
-            self.registry.app.module_load_order = mod_load_order
-            
-            for mod in mod_load_order:
-                
-                logging.info('Loading Module: '+mod)
-                
-                # Import the module
-                mod_m = importlib.import_module(mod)
-                module_path = mod_m.__path__[0]
-                
-                # Store module metadata in app.modules
-                self.registry.app.module_info[mod] = mod_info[mod]
-                self.registry.app.module_info[mod]['module_path'] = module_path
-                
-                # Run the before-model-load hook (if applicable)
-                if getattr(mod_m, 'before_model_load', False):
-                    mod_m.before_model_load(self.registry.app, mod_info[mod])
-                
-                # Import the module's models (if present)
-                has_models = False
-                try:
-                    m = importlib.import_module(mod+'.models')
-                    has_models = True
-                except ImportError:
-                    pass
-                
-                if has_models:
-                    src_files = os.listdir(os.path.join(module_path, 'models'))
-                    src_files.sort() # make sure theres some kind of determinism for module load order
-                    
-                    for src_file in src_files:
-                        if src_file == '__init__.py' or src_file[-3:] != '.py':
-                            continue
-                        m = importlib.import_module(mod+'.models.'+src_file[:-3])
-                        
-                        for msymbol in dir(m):
-                            cls = getattr(m, msymbol)
-                            if isinstance(cls, type) and issubclass(cls, RevModel):
-    
-                                # Instantiate model and add to registry
-                                # TODO: Need to work out how inheritance is going to happen!
-                                mod_inst = cls(self.registry)
-                                self.registry.set(cls.__name__, mod_inst)
-
-                # Initialise the module's http controllers
-                has_http = False
-                try:
-                    m = importlib.import_module(mod+'.controllers')
-                    has_http = True
-                except ImportError:
-                    pass
-                
-                if has_http:
-                    src_files = os.listdir(os.path.join(module_path, 'controllers'))
-                    src_files.sort()
-                    
-                    for src_file in src_files:
-                        if src_file == '__init__.py' or src_file[-3:] != '.py':
-                            continue
-                        m = importlib.import_module(mod+'.controllers.'+src_file[:-3])
-                        
-                        for msymbol in dir(m):
-                            cls = getattr(m, msymbol)
-                            if isinstance(cls, type) and cls is not RevHTTPController and issubclass(cls, RevHTTPController):
-                                
-                                logging.debug("Registering HTTP Controller: " + cls.__name__)
-                                cls.register(self.registry.app)
-            
-                # Register template path if the module has a 'templates' folder
-                template_path = os.path.join(module_path, 'templates')
-                if os.path.isdir(template_path):
-                    self.registry.app.register_template_path(template_path)
-
-                # Run the after-model-load hook (if applicable)
-                if getattr(mod_m, 'after_model_load', False):
-                    mod_m.after_model_load(self.registry.app, mod_info[mod])
-                                        
-                if mod_info[mod]['status'] != 'installed' and do_operations:
-                    self._update_data(mod_info[mod], module_path)
-    
-                    # Run the after-data-load hook (if applicable)
-                    if getattr(mod_m, 'after_data_load', False):
-                        mod_m.after_data_load(self.registry.app, mod_info[mod])
+        for mod_rec in mods_to_load:
+            mods_to_sort[mod_rec['name']] = set(mod_rec['depends'])
+            mod_info[mod_rec['name']] = mod_rec.to_dict()
         
-        # Run the after-app-load hook for all modules (if applicable)
+        if mods_to_sort:
+            mod_load_order = toposort_flatten(mods_to_sort)
+            self._registry.app.module_load_order = mod_load_order
+        
+        # 1st Pass: Initialise Models and HTTP Controllers
+        for mod in mod_load_order:
+            
+            logging.info('Loading Module: '+mod)
+            
+            # Import the module
+            mod_m = importlib.import_module(mod)
+            module_path = mod_m.__path__[0]
+            
+            # Store module metadata in app.modules
+            self._registry.app.module_info[mod] = mod_info[mod]
+            self._registry.app.module_info[mod]['module_path'] = module_path
+            
+            # Run the before-model-load hook (if applicable)
+            if getattr(mod_m, 'before_model_load', False):
+                mod_m.before_model_load(self._registry.app, mod_info[mod])
+            
+            # Import the module's models (if present)
+            has_models = False
+            try:
+                m = importlib.import_module(mod+'.models')
+                has_models = True
+            except ImportError as e:
+                logging.debug("Can't import '{}': {}".format(mod+'.models', e))
+                pass
+            
+            if has_models:
+                src_files = os.listdir(os.path.join(module_path, 'models'))
+                src_files.sort() # make sure theres some kind of determinism for module load order
+                
+                for src_file in src_files:
+                    if src_file == '__init__.py' or src_file[-3:] != '.py':
+                        continue
+                    m = importlib.import_module(mod+'.models.'+src_file[:-3])
+                    
+                    for msymbol in dir(m):
+                        cls = getattr(m, msymbol)
+                        if isinstance(cls, type) and issubclass(cls, Model):
+
+                            # Instantiate model and add to registry
+                            # DBModels and InMemoryModels are instantiated differently
+                            # Also, to avoid instantiating parent classes we check if the
+                            # class has a _description attrib. (could be improved)
+                            
+                            # TODO: Need to work out how inheritance is going to happen!
+                            mod_inst = None
+                            if issubclass(cls, DBModel) and hasattr(cls, '_description'):
+                                mod_inst = cls(self._registry, self._db)
+                            elif issubclass(cls, InMemoryModel) and hasattr(cls, '_description'):
+                                mod_inst = cls(self._registry)
+                            if mod_inst:
+                                self._registry.set(cls.__name__, mod_inst)
+
+            # Initialise the module's http controllers
+            has_http = False
+            try:
+                m = importlib.import_module(mod+'.http_controllers')
+                has_http = True
+            except ImportError:
+                pass
+            
+            if has_http:
+                src_files = os.listdir(os.path.join(module_path, 'http_controllers'))
+                src_files.sort()
+                
+                for src_file in src_files:
+                    if src_file == '__init__.py' or src_file[-3:] != '.py':
+                        continue
+                    m = importlib.import_module(mod+'.http_controllers.'+src_file[:-3])
+                    
+                    for msymbol in dir(m):
+                        cls = getattr(m, msymbol)
+                        if isinstance(cls, type) and cls is not RevHTTPController and issubclass(cls, RevHTTPController):
+                            
+                            logging.debug("Registering HTTP Controller: " + cls.__name__)
+                            cls.register(self._registry.app)
+        
+            # Register template path if the module has a 'templates' folder
+            template_path = os.path.join(module_path, 'templates')
+            if os.path.isdir(template_path):
+                self._registry.app.register_template_path(template_path)
+
+            # Run the after-model-load hook (if applicable)
+            if getattr(mod_m, 'after_model_load', False):
+                mod_m.after_model_load(self._registry.app, mod_info[mod])
+        
+        # 2nd Pass: Load all XML Data and syncdb if requested
+        for mod in mod_load_order:
+            self.load_module_data(mod_info[mod], syncdb)
+
+            # Run the after-data-load hook (if applicable)
+            mod_m = sys.modules[mod]
+            if getattr(mod_m, 'after_data_load', False):
+                mod_m.after_data_load(self._registry.app, mod_info[mod])
+        
+        # 3rd Pass: Run the after-app-load hook for all modules (if applicable)
         for mod in mod_load_order:
             mod_m = sys.modules[mod]
             if getattr(mod_m, 'after_app_load', False):
-                mod_m.after_app_load(self.registry.app, mod_info[mod])
+                mod_m.after_app_load(self._registry.app, mod_info[mod])
     
-    def _update_data(self, mod_info, mod_path):
+    def load_module_data(self, mod_info, syncdb):
         from .loader import load_data
-        load_data(mod_info, mod_path, self.registry)
-        self.update([mod_info['id']], {
-            'status' : 'installed',
-            'db_version' : mod_info['module_version'],
-        })
+        load_data(mod_info, self._registry, syncdb)
+        if syncdb:
+            self.update({'name':mod_info['name']}, {
+                'status' : 'installed',
+                'db_version' : mod_info['module_version'],
+            })
     
-    def _remove_data(self, mod_info):
+    def remove_module_data(self, mod_info):
         print('TODO: Remove data for module: ', mod_info['name'])
-        self.update([mod_info['id']], {
+        self.update({'name':mod_info['name']}, {
             'status' : 'not_installed',
         })
     

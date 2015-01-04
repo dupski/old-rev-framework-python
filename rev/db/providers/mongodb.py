@@ -1,8 +1,11 @@
 
 import logging
 
+from rev.db import DBProvider
+from rev.db.records import DBModelRecordSet
 import pymongo
 from bson.objectid import ObjectId
+from copy import deepcopy
 
 ORDER_BY_OPTIONS = {
     'asc' : pymongo.ASCENDING,
@@ -11,7 +14,7 @@ ORDER_BY_OPTIONS = {
 
 # Mongo DB Database Provider
 
-class DatabaseProvider():
+class DatabaseProvider(DBProvider):
     
     def __init__(self, db_config):
         # Initialise database including recording settings from app.settings
@@ -88,7 +91,7 @@ class DatabaseProvider():
                     rec['id'] = str(rec['_id'])
                     del rec['_id']
                 res.append(rec)
-            return res
+            return DBModelRecordSet(model, res)
         
     def create(self, model, vals, context={}):
         """
@@ -98,26 +101,38 @@ class DatabaseProvider():
         id = self._db[model._table_name].insert(vals)
         return id        
 
-    def update(self, model, ids, vals, context={}):
+    def update(self, model, criteria, vals, limit=0, context={}):
         """
         Updates existing records. Returns True if successful
+        TODO: Implement 'limit'
         """
-                
-        id_list = []
-        for id in ids:
-            id_list.append(ObjectId(id))
         
-        res = self._db[model._table_name].update({'_id' : {'$in' : id_list}}, {'$set' : vals}, multi=True)
+        if 'id' in criteria:
+            criteria = deepcopy(criteria)
+            if isinstance(criteria['id'], str):
+                criteria['_id'] = ObjectId(criteria['id'])
+                del criteria['id']
+            else:
+                criteria['_id'] = {'$in' : [ObjectId(id) for id in criteria['id']['$in']]}
+                del criteria['id']
+        
+        res = self._db[model._table_name].update(criteria, {'$set' : vals}, multi=True)
         
         return True
     
-    def delete(self, model, ids, context={}):
+    def delete(self, model, criteria, limit=0, context={}):
         """
         Deletes existing records. Returns True if successful
+        TODO: Implement 'limit'
         """
 
-        id_list = []
-        for id in ids:
-            id_list.append(ObjectId(id))
+        if 'id' in criteria:
+            criteria = deepcopy(criteria)
+            if isinstance(criteria['id'], str):
+                criteria['_id'] = ObjectId(criteria['id'])
+                del criteria['id']
+            else:
+                criteria['_id'] = {'$in' : [ObjectId(id) for id in criteria['id']['$in']]}
+                del criteria['id']
         
-        res = self._db[model._table_name].remove({'_id' : {'$in' : id_list}}, multi=True)
+        res = self._db[model._table_name].remove(criteria, multi=True)

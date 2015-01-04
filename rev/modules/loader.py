@@ -1,10 +1,13 @@
 
-from .module import RevModule
+from . import Module
+from rev.models import InMemoryModel
+from rev.models.mixins import XMLDataMixin
+from rev.models.exceptions import XMLImportError, ValidationError
 
 import logging
 import os, sys
 import imp
-import yaml
+from lxml import etree
 
 def get_available_modules(app):
     """
@@ -85,54 +88,52 @@ def get_required_changes_description(ops):
     return op_str
 
 
-def load_data(mod_info, mod_path, registry):
+def load_data(mod_info, registry, syncdb):
 
     """
     Loads all data from .yaml files in a module's data directory
     """
-    data_path = os.path.join(mod_path, 'data')
+    data_path = os.path.join(mod_info['module_path'], 'data')
     
     if not os.path.isdir(data_path):
-        return None
+        return False
 
     logging.info('Loading Module Data for '+mod_info['name'])
 
-    data_files = os.listdir(data_path)
-    data_files.sort()
+    for root, dirs, files in os.walk(data_path):
+        for filename in files:
+            if filename[-4:] != '.xml':
+                continue
 
-    from pprint import pformat
+            xml_path = os.path.join(root, filename)
+            logging.debug("Loading '{}'".format(xml_path))
+
+            xmltree = None
+            try:
+                xmltree = etree.parse(xml_path)
+            except Exception as e:
+                logging.error("Error loading {}: {}".format(xml_path, e))
+                continue
+            
+            xml_root = xmltree.getroot()
+            
+            for elem in xml_root:
+                if elem.tag is etree.Comment:
+                    continue
+                if not registry.model_exists(elem.tag):
+                    logging.error("Error on line {} of {}: Model '{}' does not exist.".format(elem.sourceline, xml_path, elem.tag))
+                    continue
+                mod = registry.get(elem.tag)
+                if not isinstance(mod, XMLDataMixin):
+                    logging.error("Error on line {} of {}: Model '{}' does not support XML Import.".format(elem.sourceline, xml_path, elem.tag))
+                    continue
+                
+                # Load item only if syncdb is enabled, or if the model is an InMemoryModel
+                if isinstance(mod, InMemoryModel) or syncdb:
+                    try:
+                        mod.xml_import_from_element(mod_info['name'], elem)
+                    except (XMLImportError, ValidationError) as e:
+                        logging.error("Error on line {} of {}: {} XML Import Error: {}".format(elem.sourceline, xml_path, elem.tag, e))
+                        continue
     
-    for data_file in data_files:
-        if data_file[-5:] == '.yaml':
-            
-            fpath = os.path.join(data_path, data_file)
-            logging.info('Loading {}...'.format(data_file))
-            
-            yaml_data = None
-            with open(fpath, 'r') as yaml_file:
-                try:
-                    yaml_data = yaml.load(yaml_file)
-                except yaml.YAMLError as e:
-                    logging.error('Error loading YAML file:\n{}'.format(e))
-                    sys.exit(1)
-                    
-            if yaml_data:
-                if not isinstance(yaml_data, list):
-                    logging.error('Root element of YAML file must be a list')
-                    sys.exit(1)
-
-                rec_no = 1
-                for rec in yaml_data:
-                    if not isinstance(rec, dict):
-                        logging.error('YAML record {} is not a dictionary'.format(rec_no))
-                        sys.exit(1)
-                    
-                    if len(rec) == 1 and registry.model_exists(list(rec)[0]):
-                        model_name = list(rec)[0]
-                        logging.debug('Loading YAML record {} which is a {}\n{}'.format(rec_no, model_name, pformat(rec)))
-                    
-                    else:
-                        logging.error('Could not interpret YAML record {}. Perhaps the model name is incorrect?\n{}'.format(rec_no, pformat(rec)))
-                        sys.exit(1)
-                    
-                    rec_no += 1
+    return True

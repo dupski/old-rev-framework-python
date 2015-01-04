@@ -6,8 +6,8 @@ import logging
 import importlib
 import sys
 
-from rev.db.models import RevModelRegistry
-from rev.modules.module import RevModule
+from rev.models import ModelRegistry
+from rev.modules import Module
 from rev.modules.staticfiles import StaticFiles, StaticFilesEndpoint
 
 # Main RevFramework Application object
@@ -58,7 +58,7 @@ class RevApp(Flask):
         db_prov = db_prov_class(default_db_config)
         
         # initialise model registry
-        self.registry = RevModelRegistry(self, db_prov)
+        self.registry = ModelRegistry(self)
         
         from rev.modules import loader
         
@@ -70,8 +70,9 @@ class RevApp(Flask):
             if mod_path not in sys.path:
                 sys.path.insert(0, mod_path)
                     
-        # Initialise the RevModule model
-        module_obj = RevModule(self.registry)
+        # Initialise the Module model and add it to the registry
+        module_obj = Module(self.registry, db_prov)
+        self.registry.set(module_obj.__class__.__name__, module_obj)
     
         # Check for installed module metadata differences
         logging.info("Checking Module Metadata...")
@@ -134,13 +135,10 @@ class RevApp(Flask):
                         logging.info("Operations Cancelled.")
                     sys.exit(1)
 
-        module_obj.load_modules(do_operations=syncdb)
+        module_obj.load_modules(syncdb)
         
         if not syncdb:
-            
-            # initialise model registry
-            self.registry = RevModelRegistry(self, db_prov)
-            
+                        
             # initialise static files class
             self.staticfiles = StaticFiles(self)
             StaticFilesEndpoint.register(self)

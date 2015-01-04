@@ -1,8 +1,9 @@
 
-from rev.db import models, fields
+from rev.db.models import DBModel
+from rev.models import fields
 from rev.i18n import translate as _
 
-class RevUser(models.RevModel):
+class User(DBModel):
 
     _description = 'User'
     
