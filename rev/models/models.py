@@ -1,7 +1,6 @@
 
 from . import fields
 from .exceptions import ValidationError
-from .records import InMemoryRecordSet
 from .fields import Field
 from rev.i18n import translate as _
 
@@ -82,97 +81,3 @@ class Model():
         Deletes existing records. Returns True if successful
         """
         raise Exception("delete() not implemented for this Model type")
-
-
-class InMemoryModel(Model):
-    """
-    A simple model that uses a dictionary for its storage. The dictionary is
-    currently only keyed (and therefore searchable) by 'id'.
-    """
-
-    # InMemoryModels must have an 'id' (the dictionary key)
-    id = fields.RecordIDField(_('Record ID'))
-    
-    def __init__(self, registry):
-        super().__init__(registry)
-        self._data = {}
-    
-    def find(self, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
-        """
-        Search the model data using the specified criteria, and return the matching data
-        Returns a ModelRecords iterable object
-        """
-        if criteria == {}:
-            return InMemoryRecordSet(self, [self._data[id] for id in self._data.keys()])
-
-        # We currently only allow searching by id
-        if 'id' not in criteria:
-            raise ValidationError("InMemoryModel records can only be searched by 'id'")
-        if isinstance(criteria['id'], str):
-            if criteria['id'] in self._data:
-                return InMemoryRecordSet(self, [self._data[criteria['id']]])
-            else:
-                return InMemoryRecordSet(self, [])
-        else:
-            return InMemoryRecordSet(self, [self._data[id] for id in criteria['id']['$in'] if id in self._data])
-    
-    def create_record_id(self, vals, context={}):
-        """
-        Generate a unique ID for the new record
-        """
-        from uuid import uuid4
-        return str(uuid4())
-    
-    def create(self, vals, context={}):
-        """
-        Creates a new record. Returns the id of the created record
-        """
-
-        if 'id' not in vals:
-            vals['id'] = self.create_record_id(vals, context)
-        
-        create_vals = super().get_create_vals(vals, context)
-                
-        if create_vals['id'] in self._data:
-            raise ValidationError("The id '{}' already exists".format(create_vals['id']))
-        
-        # Do Create
-        self._data[create_vals['id']] = create_vals
-        
-        return create_vals['id']        
-
-    def update(self, criteria, vals, limit=0, context={}):
-        """
-        Updates existing records. Returns True if successful
-        #TODO: Implement 'limit'
-        """
-                
-        super().validate_field_values(vals)
-        
-        if 'id' not in criteria:
-            raise ValidationError("InMemoryModel records can only be updated by 'id'")
-
-        if isinstance(criteria['id'], str):
-            self._data[criteria['id']].update(vals)
-        else:
-            for id in criteria['id']['$in']:
-                self._data[id].update(vals)
-        
-        return True
-    
-    def delete(self, criteria, limit=0, context={}):
-        """
-        Deletes existing records. Returns True if successful
-        #TODO: Implement 'limit'
-        """
-
-        if 'id' not in criteria:
-            raise ValidationError("InMemoryModel records can only be deleted by 'id'")
-
-        if isinstance(criteria['id'], str):
-            del self._data[criteria['id']]
-        else:
-            for id in criteria['id']['$in']:
-                del self._data[id]
-            
-        return True

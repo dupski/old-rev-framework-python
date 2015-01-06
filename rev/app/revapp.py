@@ -50,6 +50,18 @@ class RevApp(Flask):
         Initialise configuration, database and installed modules
         """
         
+        # initialise in-memory cache
+        inmem_provider_settings = self.settings.get(
+                                        'IN_MEMORY_MODEL_PROVIDERS', {}).get(
+                                            'default', {})
+        inmem_provider_module_name = inmem_provider_settings.get(
+                                        'provider',
+                                            'rev.models.inmemory.providers.dictprovider')
+        inmem_provider_module = importlib.import_module(inmem_provider_module_name)
+        inmem_provider_class = getattr(inmem_provider_module, 'InMemoryProvider')
+        
+        self._inmemory_provider = inmem_provider_class(inmem_provider_settings)
+        
         # intialise default database
         default_db_config = self.settings['DATABASES']['default']
         db_prov_module = importlib.import_module(default_db_config['provider'])

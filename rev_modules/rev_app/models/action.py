@@ -24,5 +24,3 @@ class Action(MetadataModel):
     view_types = fields.MultiSelectionField(_('View Type List'), MODEL_VIEW_TYPES, required=False)
     views = fields.RecordLinkField(_('Linked Views'), 'View', multi=True, required=False)
     filter = fields.JSONField(_('Record Filter'), required=False)
-
-    _unique = ['name']

@@ -363,7 +363,7 @@ class Module(DBModel):
 
                             # Instantiate model and add to registry
                             # DBModels and InMemoryModels are instantiated differently
-                            # Also, to avoid instantiating parent classes we check if the
+                            # Also, to avoid instantiating 'abstract' classes we check if the
                             # class has a _description attrib. (could be improved)
                             
                             # TODO: Need to work out how inheritance is going to happen!
@@ -371,7 +371,7 @@ class Module(DBModel):
                             if issubclass(cls, DBModel) and hasattr(cls, '_description'):
                                 mod_inst = cls(self._registry, self._db)
                             elif issubclass(cls, InMemoryModel) and hasattr(cls, '_description'):
-                                mod_inst = cls(self._registry)
+                                mod_inst = cls(self._registry, self._registry.app._inmemory_provider)
                             if mod_inst:
                                 self._registry.set(cls.__name__, mod_inst)
 
