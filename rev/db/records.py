@@ -1,45 +1,60 @@
 
-from rev.models import ModelRecord, ModelRecordSet
-
-class DBModelRecordSet(ModelRecordSet):
+class ModelRecordSet():
     """
     Encapsulates the results of a find() on a DNModel
     Currently this simply re-returns the list of results, however in future
     this could be extended to make use of cursors
     """
-    def __init__(self, model, records):
-        super().__init__(model)
-        self._records = records
-        self._current_record_idx = 0
-        
+    def __init__(self, model):
+        self._model = model
     def __len__(self):
-        return len(self._records)
-
+        raise Exception('ModelRecordSet object should implement __len__()')
     def __getitem__(self, key):
-        return DBModelRecord(self._model, self._records[key])
-    
+        raise Exception('ModelRecordSet object should implement __getitem__()')
     def __iter__(self):
-        return self
-    
+        raise Exception('ModelRecordSet object should implement __iter__()')
     def __next__(self):
-        if self._current_record_idx < len(self._records):
-            item, \
-            self._current_record_idx = \
-                DBModelRecord(self._model, self._records[self._current_record_idx]), \
-                self._current_record_idx + 1
-            return item
-        else:
-            raise StopIteration()
+        raise Exception('ModelRecordSet object should implement __next__()')
 
-class DBModelRecord(ModelRecord):
+    def __repr__(self):
+        return "{}('{}')".format(self.__class__.__name__, self._model)
+
+    def to_json(self):
+        return [record.to_json() for record in self]
+
+class ModelRecord():
     """
-    Encapsulates a single database record, normally returned from a DBModelRecordSet
+    Encapsulates a single database record, normally returned from a ModelRecordSet
     """
-    def __init__(self, model, record):
-        super().__init__(model)
-        self._record = record
+    def __init__(self, model):
+        self._model = model
         
     def __getitem__(self, key):
-        if key not in self._record:
-            raise KeyError(key)
-        return self._record[key]
+        raise Exception('ModelRecord object should implement __getitem__()')
+
+    def __repr__(self):
+        return "{}('{}')".format(self.__class__.__name__, self._model)
+
+    def get(self, key, default=None):
+        res = default
+        try:
+            res = self[key]
+        except KeyError:
+            pass
+        return res
+
+    @property
+    def fields(self):
+        """
+        return the dictionary of fields for this record type
+        """
+        return self._model._fields
+    
+    def to_dict(self):
+        res = {}
+        for field in self.fields.keys():
+            res[field] = self.get(field, None)
+        return res
+    
+    def to_json(self):
+        return str(self.to_dict())

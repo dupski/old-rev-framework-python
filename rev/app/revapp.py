@@ -6,7 +6,7 @@ import logging
 import importlib
 import sys
 
-from rev.models import ModelRegistry
+from rev.db.registry import ModelRegistry
 from rev.modules import Module
 from rev.modules.staticfiles import StaticFiles, StaticFilesEndpoint
 
@@ -31,16 +31,16 @@ class RevApp(Flask):
         self.template_paths = []
         self.module_info = {}
         self.module_load_order = []
-                
-        # Load settings module into self.settings
+                        
+        # Hardcode the flask import_name to 'rev'. Template and static file paths are sorted out later.
+        super().__init__('rev', *args, static_folder=None, **kwargs)
+        
+        # Load settings module into flask app.config
         self.name = app_name
-        self.settings = {}
         for setting in dir(settings):
             if setting.isupper():
-                self.settings[setting] = getattr(settings, setting)
-        
-        # Hardcode the flask import_name to 'rev'. Template and static file paths are sorted out later.
-        return super().__init__('rev', *args, static_folder=None, **kwargs)
+                self.config[setting] = getattr(settings, setting)
+
 
     def register_template_path(self, template_path):
         self.template_paths.append(template_path)
@@ -50,24 +50,13 @@ class RevApp(Flask):
         Initialise configuration, database and installed modules
         """
         
-        # initialise in-memory cache
-        inmem_provider_settings = self.settings.get(
-                                        'IN_MEMORY_MODEL_PROVIDERS', {}).get(
-                                            'default', {})
-        inmem_provider_module_name = inmem_provider_settings.get(
-                                        'provider',
-                                            'rev.models.inmemory.providers.dictprovider')
-        inmem_provider_module = importlib.import_module(inmem_provider_module_name)
-        inmem_provider_class = getattr(inmem_provider_module, 'InMemoryProvider')
-        
-        self._inmemory_provider = inmem_provider_class(inmem_provider_settings)
-        
-        # intialise default database
-        default_db_config = self.settings['DATABASES']['default']
-        db_prov_module = importlib.import_module(default_db_config['provider'])
-        db_prov_class = getattr(db_prov_module, 'DatabaseProvider')
-        
-        db_prov = db_prov_class(default_db_config)
+        # initialise database providers
+        self.databases = {}
+        for db_name in self.config['DATABASES'].keys():
+            provider_conf = self.config['DATABASES'][db_name]
+            prov_module = importlib.import_module(provider_conf['provider'])
+            prov_class = getattr(prov_module, 'DatabaseProvider')
+            self.databases[db_name] = prov_class(provider_conf, db_name)
         
         # initialise model registry
         self.registry = ModelRegistry(self)
@@ -78,12 +67,12 @@ class RevApp(Flask):
         available_modules = loader.get_available_modules(self)
         
         # Module paths validated. Add them to python path
-        for mod_path in self.settings['MODULE_PATHS']:
+        for mod_path in self.config['MODULE_PATHS']:
             if mod_path not in sys.path:
                 sys.path.insert(0, mod_path)
                     
         # Initialise the Module model and add it to the registry
-        module_obj = Module(self.registry, db_prov)
+        module_obj = Module(self.registry)
         self.registry.set(module_obj.__class__.__name__, module_obj)
     
         # Check for installed module metadata differences
@@ -105,7 +94,7 @@ class RevApp(Flask):
 
         # Check that the status of modules in INSTALLED_MODULES matches the database
         req_state_changes = module_obj.get_state_changes_needed(
-                                            self.settings['INSTALLED_MODULES'])
+                                            self.config['INSTALLED_MODULES'])
         
         # Log a warning if this is the case, or schedule operations if syncdb=True
         if req_state_changes['install'] or req_state_changes['remove']:
@@ -137,7 +126,7 @@ class RevApp(Flask):
                 logging.info(op_str)
                 response = ''
                 while response not in ['y','n']:
-                    response = input("Apply these changes for database '{}'? (y/n): ".format(db_prov.db_name)).lower()
+                    response = input("Apply these changes? (y/n): ").lower()
                 if response == 'n':
                     response = ''
                     while response not in ['y','n']:

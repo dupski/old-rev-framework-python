@@ -1,6 +1,6 @@
 
 from . import MetadataModel
-from rev.models import fields
+from rev.db import fields
 from rev.i18n import translate as _
 
 ACTION_TYPES = [
@@ -16,6 +16,7 @@ class Action(MetadataModel):
 
     _description = 'Rev App UI Action'
     
+    id = fields.RecordIDField(_('Action ID'))
     name = fields.TextField(_('Action Name'))
     type = fields.SelectionField(_('Action Type'), ACTION_TYPES)
     

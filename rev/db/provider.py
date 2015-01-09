@@ -5,8 +5,8 @@ class DBProvider():
     Base Class for Rev DB Providers
     """
     
-    def __init__(self, db_config):
-        # Initialise database including recording settings from app.settings
+    def __init__(self, db_config, name):
+        # Initialise database including recording settings from app.config
         pass
         
     def init_model(self, model):

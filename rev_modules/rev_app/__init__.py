@@ -2,7 +2,7 @@
 import logging
 from .view import load_views, rev_view_jinja_fn
 
-def after_app_load(app, prev_mod_info):
+def after_app_load(app, prev_mod_info, syncdb):
     logging.info("Loading Views for Running Modules...")
     app.views = load_views(app)
     

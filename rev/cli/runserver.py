@@ -26,14 +26,14 @@ class RunServerArgParser(BaseArgParser):
                           type=str,
                           nargs='?',
                           action=IPAddressValidator,
-                          default=app.settings['DEBUG_SERVER_ADDRESS'],
+                          default=app.config['DEBUG_SERVER_ADDRESS'],
                           help='Sets the IP Address to run the server on')
         
         self.add_argument('port',
                           type=int,
                           nargs='?',
                           action=PortNumberValidator,
-                          default=app.settings['DEBUG_SERVER_PORT'],
+                          default=app.config['DEBUG_SERVER_PORT'],
                           help='Sets the Port Number to run the server on')
 
 import logging

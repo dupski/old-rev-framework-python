@@ -1,11 +1,11 @@
 
-import rev
-from rev.db.models import DBModel
-from rev.models import Model, InMemoryModel, fields
+from rev.db import Model, fields
 from rev.i18n import translate as _
 
-from rev.models.exceptions import ValidationError
+from rev.db.exceptions import ValidationError
 from rev.http import RevHTTPController
+
+from .loader import load_data, get_module_data_hash
 
 from toposort import toposort_flatten
 import importlib
@@ -22,7 +22,7 @@ MODULE_STATUSES = [
 
 # Module Metadata container and business logic
 
-class Module(DBModel):
+class Module(Model):
 
     _description = 'Rev Module Information'
     
@@ -32,6 +32,7 @@ class Module(DBModel):
     module_version = fields.TextField(_('Module Version'))
     db_version = fields.TextField(_('Installed Version'))
     status = fields.SelectionField(_('Status'), MODULE_STATUSES, default_value='not_installed')
+    module_data_hash = fields.TextField(_('Module Data Checksum'), required=False)
     depends = fields.MultiSelectionField(_('Dependancies'), None, required=False)
     
     _unique = ['name']
@@ -81,7 +82,7 @@ class Module(DBModel):
                 res.setdefault('removed_modules', []).append(mod['name'])
         
         return res
-
+    
     def get_scheduled_operations(self):
         
         ops = {
@@ -305,7 +306,11 @@ class Module(DBModel):
                 mod_remove_order.reverse()
                 for mod in mod_remove_order:
                     if mod in removed_mod_info:
-                        self.remove_module_data(removed_mod_info[mod])
+                        print('TODO: Remove data for module: ', mod)
+                        self.update({'name':mod}, {
+                            'status' : 'not_installed',
+                        })
+
   
         # load modules
         mods_to_sort = {}
@@ -337,7 +342,7 @@ class Module(DBModel):
             
             # Run the before-model-load hook (if applicable)
             if getattr(mod_m, 'before_model_load', False):
-                mod_m.before_model_load(self._registry.app, mod_info[mod])
+                mod_m.before_model_load(self._registry.app, mod_info[mod], syncdb)
             
             # Import the module's models (if present)
             has_models = False
@@ -362,18 +367,14 @@ class Module(DBModel):
                         if isinstance(cls, type) and issubclass(cls, Model):
 
                             # Instantiate model and add to registry
-                            # DBModels and InMemoryModels are instantiated differently
-                            # Also, to avoid instantiating 'abstract' classes we check if the
+                            # to avoid instantiating 'abstract' classes we check if the
                             # class has a _description attrib. (could be improved)
                             
                             # TODO: Need to work out how inheritance is going to happen!
                             mod_inst = None
-                            if issubclass(cls, DBModel) and hasattr(cls, '_description'):
-                                mod_inst = cls(self._registry, self._db)
-                            elif issubclass(cls, InMemoryModel) and hasattr(cls, '_description'):
-                                mod_inst = cls(self._registry, self._registry.app._inmemory_provider)
-                            if mod_inst:
-                                self._registry.set(cls.__name__, mod_inst)
+                            if issubclass(cls, Model) and hasattr(cls, '_description'):
+                                mod_inst = cls(self._registry)
+                            self._registry.set(cls.__name__, mod_inst)
 
             # Initialise the module's http controllers
             has_http = False
@@ -406,37 +407,35 @@ class Module(DBModel):
 
             # Run the after-model-load hook (if applicable)
             if getattr(mod_m, 'after_model_load', False):
-                mod_m.after_model_load(self._registry.app, mod_info[mod])
+                mod_m.after_model_load(self._registry.app, mod_info[mod], syncdb)
         
-        # 2nd Pass: Load all XML Data and syncdb if requested
+        # 2nd Pass: Check / Load Module XML Data
         for mod in mod_load_order:
-            self.load_module_data(mod_info[mod], syncdb)
+            dir_hash = get_module_data_hash(mod_info[mod])
+            
+            if syncdb:
+                load_data(mod_info[mod], self._registry)
+                
+                self.update({'name':mod_info[mod]['name']}, {
+                    'status' : 'installed',
+                    'db_version' : mod_info[mod]['module_version'],
+                    'module_data_hash' : dir_hash,
+                })
 
-            # Run the after-data-load hook (if applicable)
-            mod_m = sys.modules[mod]
-            if getattr(mod_m, 'after_data_load', False):
-                mod_m.after_data_load(self._registry.app, mod_info[mod])
+                # Run the after-data-load hook (if applicable)
+                mod_m = sys.modules[mod]
+                if getattr(mod_m, 'after_data_load', False):
+                    mod_m.after_data_load(self._registry.app, mod_info[mod])
+            
+            else:
+                if str(dir_hash) != str(mod_info[mod]['module_data_hash']):
+                    logging.warning("Data for module '{}' has changed. You should run './app.py syncdb' to update the database.".format(mod))
         
         # 3rd Pass: Run the after-app-load hook for all modules (if applicable)
         for mod in mod_load_order:
             mod_m = sys.modules[mod]
             if getattr(mod_m, 'after_app_load', False):
-                mod_m.after_app_load(self._registry.app, mod_info[mod])
-    
-    def load_module_data(self, mod_info, syncdb):
-        from .loader import load_data
-        load_data(mod_info, self._registry, syncdb)
-        if syncdb:
-            self.update({'name':mod_info['name']}, {
-                'status' : 'installed',
-                'db_version' : mod_info['module_version'],
-            })
-    
-    def remove_module_data(self, mod_info):
-        print('TODO: Remove data for module: ', mod_info['name'])
-        self.update({'name':mod_info['name']}, {
-            'status' : 'not_installed',
-        })
+                mod_m.after_app_load(self._registry.app, mod_info[mod], syncdb)
     
     def delete(self, ids, context={}):
         """

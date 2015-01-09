@@ -13,7 +13,7 @@ class Field():
         return self.default_value
     
     def validate_value(self, obj, name, value):
-        if self.required and not value:
+        if name != 'id' and self.required and not value:
             raise ValidationError("Field '{}' on object '{}' is required!".format(name, obj._name))
 
 # Primary Key Field

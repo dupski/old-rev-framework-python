@@ -2,10 +2,12 @@
 import logging
 
 from rev.db import DBProvider
-from rev.db.records import DBModelRecordSet
+from rev.db.records import ModelRecordSet, ModelRecord
 import pymongo
 from bson.objectid import ObjectId
 from copy import deepcopy
+
+import re
 
 ORDER_BY_OPTIONS = {
     'asc' : pymongo.ASCENDING,
@@ -16,8 +18,9 @@ ORDER_BY_OPTIONS = {
 
 class DatabaseProvider(DBProvider):
     
-    def __init__(self, db_config):
-        # Initialise database including recording settings from app.settings
+    def __init__(self, db_config, name):
+        # Initialise database provider including recording settings from app.config
+        self.name = name
         self.host = db_config['host']
         self.port = db_config['port']
         self.db_name = db_config['database']
@@ -33,6 +36,11 @@ class DatabaseProvider(DBProvider):
         # Create collection for specified model if it does not already exist
         
         db = self._db
+
+        # _table_name is CamelCaseName converted to camel_case_name
+        model._table_name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', model._name)
+        model._table_name = re.sub('([a-z0-9])([A-Z])', r'\1_\2', model._table_name).lower()
+        model._table_name.replace('__', '_')
         
         if model._table_name not in db.collection_names():
             logging.info('Creating Collection: %s', model._table_name)
@@ -91,13 +99,16 @@ class DatabaseProvider(DBProvider):
                     rec['id'] = str(rec['_id'])
                     del rec['_id']
                 res.append(rec)
-            return DBModelRecordSet(model, res)
+            return MongoDBRecordSet(model, res)
         
     def create(self, model, vals, context={}):
         """
         Creates a new record. Returns the id of the created record
         """
         
+        if 'id' in vals:
+            del vals['id'] # Temporary workaround until we figure out a good way to handle mongo's _id
+            
         id = self._db[model._table_name].insert(vals)
         return id        
 
@@ -136,3 +147,48 @@ class DatabaseProvider(DBProvider):
                 del criteria['id']
         
         res = self._db[model._table_name].remove(criteria, multi=True)
+
+
+class MongoDBRecordSet(ModelRecordSet):
+    """
+    Encapsulates the results of a find() on a Model from MongoDB
+    Currently this simply re-returns the list of results, however in future
+    this could be extended to make use of cursors
+    """
+    def __init__(self, model, records):
+        super().__init__(model)
+        self._records = records
+        self._current_record_idx = 0
+        
+    def __len__(self):
+        return len(self._records)
+
+    def __getitem__(self, key):
+        return MongoDBRecord(self._model, self._records[key])
+    
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self._current_record_idx < len(self._records):
+            item, \
+            self._current_record_idx = \
+                MongoDBRecord(self._model, self._records[self._current_record_idx]), \
+                self._current_record_idx + 1
+            return item
+        else:
+            raise StopIteration()
+
+
+class MongoDBRecord(ModelRecord):
+    """
+    Encapsulates a single database record, normally returned from a ModelRecordSet
+    """
+    def __init__(self, model, record):
+        super().__init__(model)
+        self._record = record
+        
+    def __getitem__(self, key):
+        if key not in self.fields.keys():
+            raise KeyError(key)
+        return self._record.get(key, None)

@@ -1,12 +1,12 @@
 
-from rev.db.models import DBModel
-from rev.models import fields
+from rev.db import Model, fields
 from rev.i18n import translate as _
 
-class User(DBModel):
+class User(Model):
 
     _description = 'User'
     
+    id = fields.RecordIDField(_('User ID'))
     name = fields.TextField(_('Login Name'))
     email = fields.TextField(_('E-mail Address'))
 

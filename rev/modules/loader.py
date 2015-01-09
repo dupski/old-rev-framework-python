@@ -1,11 +1,9 @@
 
-from . import Module
-from rev.models import InMemoryModel
-from rev.models.mixins import XMLDataMixin
-from rev.models.exceptions import XMLImportError, ValidationError
+from rev.db.mixins import XMLDataMixin
+from rev.db.exceptions import XMLImportError, ValidationError
 
 import logging
-import os, sys
+import os
 import imp
 from lxml import etree
 
@@ -19,9 +17,9 @@ def get_available_modules(app):
     available_modules = {}
     
     # Check specified module paths and collect metadata
-    logging.info("Module Paths: " + ','.join(app.settings['MODULE_PATHS']))
+    logging.info("Module Paths: " + ','.join(app.config['MODULE_PATHS']))
 
-    mod_path_list = app.settings['MODULE_PATHS']
+    mod_path_list = app.config['MODULE_PATHS']
     for mod_path in mod_path_list:
         if not os.path.isdir(mod_path):
             raise Exception("Module Path '{}' is not a directory!".format(mod_path))
@@ -88,7 +86,7 @@ def get_required_changes_description(ops):
     return op_str
 
 
-def load_data(mod_info, registry, syncdb):
+def load_data(mod_info, registry):
 
     """
     Loads all data from .yaml files in a module's data directory
@@ -127,13 +125,48 @@ def load_data(mod_info, registry, syncdb):
                 if not isinstance(mod, XMLDataMixin):
                     logging.error("Error on line {} of {}: Model '{}' does not support XML Import.".format(elem.sourceline, xml_path, elem.tag))
                     continue
-                
-                # Load item only if syncdb is enabled, or if the model is an InMemoryModel
-                if isinstance(mod, InMemoryModel) or syncdb:
-                    try:
-                        mod.xml_import_from_element(mod_info['name'], elem)
-                    except (XMLImportError, ValidationError) as e:
-                        logging.error("Error on line {} of {}: {} XML Import Error: {}".format(elem.sourceline, xml_path, elem.tag, e))
-                        continue
+                try:
+                    mod.xml_import_from_element(mod_info['name'], elem)
+                except (XMLImportError, ValidationError) as e:
+                    logging.error("Error on line {} of {}: {} XML Import Error: {}".format(elem.sourceline, xml_path, elem.tag, e))
+                    continue
     
     return True
+
+
+def get_module_data_hash(mod_info):
+    """
+    Returns the SHA1 Hash of the data in a particular directory
+    """
+
+    data_path = os.path.join(mod_info['module_path'], 'data')
+
+    if not os.path.isdir(data_path):
+        return None
+    
+    import hashlib
+    hashval = hashlib.sha1()
+    
+    for root, dirs, files in os.walk(data_path):
+        for filename in files:
+            
+            if filename[-4:] != '.xml':
+                continue
+            
+            filepath = os.path.join(root, filename)
+            filesize = os.path.getsize(filepath)
+
+            try:
+                file = open(filepath, 'rb')
+            except Exception as e:
+                logging.debug("Unable to open '{}': {}".format(filepath, e))
+                file.close()
+                continue
+
+            while file.tell() < filesize:
+                fdata = file.read(4096)
+                if fdata:
+                    hashval.update(hashlib.sha1(fdata).hexdigest().encode('utf-8'))
+            file.close()
+
+    return hashval.hexdigest()
