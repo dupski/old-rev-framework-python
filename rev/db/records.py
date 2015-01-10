@@ -1,9 +1,7 @@
 
 class ModelRecordSet():
     """
-    Encapsulates the results of a find() on a DNModel
-    Currently this simply re-returns the list of results, however in future
-    this could be extended to make use of cursors
+    Encapsulates the results of a find() on a Model
     """
     def __init__(self, model):
         self._model = model

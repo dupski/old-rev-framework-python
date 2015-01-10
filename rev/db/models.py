@@ -19,7 +19,7 @@ class Model():
         self._registry = registry
         self._database = registry.app.databases[self._database]
 
-        logging.info('Loading Model: %s (%s)', self._name, self._description)
+        logging.debug('Loading Model: %s (%s)', self._name, self._description)
         
         # configure self._fields
         self._fields = {}

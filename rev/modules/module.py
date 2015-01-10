@@ -328,9 +328,10 @@ class Module(Model):
             self._registry.app.module_load_order = mod_load_order
         
         # 1st Pass: Initialise Models and HTTP Controllers
+        logging.info('Initialising Modules...')
         for mod in mod_load_order:
             
-            logging.info('Loading Module: '+mod)
+            logging.debug(' * Initialising Module: ' + mod)
             
             # Import the module
             mod_m = importlib.import_module(mod)
@@ -410,6 +411,7 @@ class Module(Model):
                 mod_m.after_model_load(self._registry.app, mod_info[mod], syncdb)
         
         # 2nd Pass: Check / Load Module XML Data
+        logging.info('Loading Module Data...')
         for mod in mod_load_order:
             dir_hash = get_module_data_hash(mod_info[mod])
             
@@ -430,8 +432,11 @@ class Module(Model):
             else:
                 if str(dir_hash) != str(mod_info[mod]['module_data_hash']):
                     logging.warning("Data for module '{}' has changed. You should run './app.py syncdb' to update the database.".format(mod))
+                else:
+                    logging.debug("Data for module '{}' is up-to-date.".format(mod))
         
         # 3rd Pass: Run the after-app-load hook for all modules (if applicable)
+        logging.info("Running 'after_app_load' Actions...")
         for mod in mod_load_order:
             mod_m = sys.modules[mod]
             if getattr(mod_m, 'after_app_load', False):
