@@ -31,7 +31,7 @@ class ModelRecord():
         raise Exception('ModelRecord object should implement __getitem__()')
 
     def __repr__(self):
-        return "{}('{}')".format(self.__class__.__name__, self._model)
+        return "{}('{}')".format(self.__class__.__name__, self._model.__class__.__name__)
 
     def get(self, key, default=None):
         res = default

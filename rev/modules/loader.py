@@ -119,16 +119,16 @@ def load_data(mod_info, registry):
                 if elem.tag is etree.Comment:
                     continue
                 if not registry.model_exists(elem.tag):
-                    logging.error("Error on line {} of {}: Model '{}' does not exist.".format(elem.sourceline, xml_path, elem.tag))
+                    logging.error("Error in {} on line {}: Model '{}' does not exist.".format(xml_path, elem.sourceline, elem.tag))
                     continue
                 mod = registry.get(elem.tag)
                 if not isinstance(mod, XMLDataMixin):
-                    logging.error("Error on line {} of {}: Model '{}' does not support XML Import.".format(elem.sourceline, xml_path, elem.tag))
+                    logging.error("Error in {} on line {}: Model '{}' does not support XML Import.".format(xml_path, elem.sourceline, elem.tag))
                     continue
                 try:
                     mod.xml_import_from_element(mod_info['name'], elem)
                 except (XMLImportError, ValidationError) as e:
-                    logging.error("Error on line {} of {}: {} XML Import Error: {}".format(elem.sourceline, xml_path, elem.tag, e))
+                    logging.error("Error in {} on line {}: {} XML Import Error: {}".format(xml_path, elem.sourceline, elem.tag, e))
                     continue
     
     return True

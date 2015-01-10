@@ -6,7 +6,7 @@ from rev.db.exceptions import ValidationError
 
 class Model():
     
-    def __init__(self, registry):
+    def __init__(self, registry, *args, **kwargs):
 
         if not getattr(self, '_description', False):
             raise Exception('Models must have a _description property defined!');
@@ -29,8 +29,11 @@ class Model():
         
         # initialise model in database #TODO: This should really be done via syncdb
         self._database.init_model(self)
+        
+        # Make sure any mixin classes are also __init__'ed
+        super().__init__(*args, **kwargs)
     
-    def find(self, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
+    def find(self, criteria={}, read_fields=['*'], order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
         Search the database using the specified criteria, and return the matching data
         """
