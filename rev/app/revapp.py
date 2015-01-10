@@ -1,5 +1,6 @@
 
 from flask import Flask
+from werkzeug.contrib.cache import SimpleCache
 from jinja2 import FileSystemLoader, ChoiceLoader
 
 import logging
@@ -40,6 +41,10 @@ class RevApp(Flask):
         for setting in dir(settings):
             if setting.isupper():
                 self.config[setting] = getattr(settings, setting)
+        
+        # Configure cache
+        # TODO: Support other cache types!
+        self.cache = SimpleCache()
 
 
     def register_template_path(self, template_path):
