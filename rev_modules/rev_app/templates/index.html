@@ -5,19 +5,18 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>@{{app.name}}</title>
-	<!--<link rel="stylesheet" href="static/lib/bootstrap-3.3.1/bootstrap.min.css" />-->
-	<link rel="stylesheet" href="static/lib/bootswatch-cerulean-theme/bootstrap.min.css" />
-	<link rel="stylesheet" href="static/css/app.css" />
-	<script src="static/lib/angular-1.3.8/angular.js"></script>
-	<script src="static/lib/ui-bootstrap-0.12.0/ui-bootstrap-tpls-0.12.0.min.js"></script>
-	<script src="static/lib/ui-router-0.2.13/angular-ui-router.js"></script>
-	<script src="static/js/app.js"></script>
+	@{% for css_file in css_files %}
+	<link rel="stylesheet" href="@{{css_file}}" />
+	@{% endfor %}
+	@{% for js_file in js_files %}
+	<script src="@{{js_file}}"></script>
+	@{% endfor %}
 </head>
 <body ng-app="revapp">
 
 	@{{ rev_view('rev_app.app_navbar') }}
 	
 	@{{ rev_view('rev_app.app_content_wrapper') }}
-
+	
 </body>
 </html>
