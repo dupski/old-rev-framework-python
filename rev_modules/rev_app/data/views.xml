@@ -37,8 +37,7 @@
 		      <ul class="nav navbar-nav navbar-right" name="navbar_right">
 		        <li class="dropdown" dropdown="true">
 		          <a href="#" class="dropdown-toggle" dropdown-toggle="true" role="button">
-		          	<span class="glyphicon glyphicon-question-sign" style="margin-right:5px;"> </span>
-		          	Help
+		          	<span class="glyphicon glyphicon-question-sign" style="margin-right:5px;"> </span> Help
 		          	<span class="caret"> </span>
 		          </a>
 		          <ul class="dropdown-menu" role="menu" name="help_menu">

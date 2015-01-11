@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<rev>
+
+	<View modify="rev_app.app_navbar">
+		
+		<!-- Add Login Menu -->
+		<modify xpath="//ul[@name='navbar_right']" action="insert_inside" position="0">
+		
+	        <li ng-controller="UserMenuController" ng-class="{dropdown: isLoggedIn}" ng-attr-dropdown="isLoggedIn">
+	        
+		        <a href="#/login" ng-if="!isLoggedIn">
+					<span class="glyphicon glyphicon-user" style="margin-right:5px;"> </span> Log In
+				</a>
+				
+				<a href="#" ng-if="isLoggedIn" class="dropdown-toggle" dropdown-toggle="true" role="button">
+					<span class="glyphicon glyphicon-user" style="margin-right:5px;"> </span> {{ user.name }}
+					<span class="caret"> </span>
+				</a>
+				<ul class="dropdown-menu" ng-if="isLoggedIn" role="menu" name="user_menu">
+					<li><a href="#/preferences" name="preferences_link">Preferences</a></li>
+					<li class="divider"></li>
+					<li><a href="#/logout" name="logout_link">Log Out</a></li>
+				</ul>
+			</li>
+			
+        </modify>
+		
+	</View>
+
+	<View id="login" name="Login Form">
+		
+		<div class="row" ng-controller="LoginFormController">
+			<div class="col-md-12">
+				<h1>@{{app.name}} Login</h1>
+			
+				<button class="btn btn-primary" ng-click="doLogin()">Login</button>
+			</div>
+		</div>
+		
+	</View>
+
+	<View id="logout" name="Logout Screen">
+		
+		<div class="row" ng-controller="LogoutController">
+			<div class="col-md-12">
+				<h1>@{{app.name}}</h1>
+				
+				<p>You have been logged out.</p>
+			</div>
+		</div>
+		
+	</View>
+
+</rev>

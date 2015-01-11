@@ -5,11 +5,8 @@
 	<meta http-equiv="X-UA-Compatible" content="IE=edge" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<title>@{{app.name}}</title>
-	@{% for css_file in css_files %}
-	<link rel="stylesheet" href="@{{css_file}}" />
-	@{% endfor %}
-	@{% for js_file in js_files %}
-	<script src="@{{js_file}}"></script>
+	@{% for css_file in css_files %}<link rel="stylesheet" href="@{{css_file}}" />
+	@{% endfor %}@{% for js_file in js_files %}<script src="@{{js_file}}"></script>
 	@{% endfor %}
 </head>
 <body ng-app="revapp">
