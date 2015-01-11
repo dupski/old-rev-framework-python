@@ -7,6 +7,14 @@ import os
 import imp
 from lxml import etree
 
+def load_config_file(config_file_path):
+    """
+    Loads a python-format config file into a dictionary and returns it
+    """
+    config_info = {}
+    exec(open(config_file_path).read(), {}, config_info)
+    return config_info
+
 def get_available_modules(app):
     """
     Scan the app's MODULE_PATHS and return a dictionary of all the available module metadata
@@ -38,9 +46,8 @@ def get_available_modules(app):
             if not os.path.isfile(rev_conf_file):
                 raise Exception("Module '{}' has no __rev__.conf file".format(mod_folder))
             
-            module_info = {}
-            exec(open(rev_conf_file).read(), {}, module_info)            
-
+            module_info = load_config_file(rev_conf_file)
+            
             if module_info.get('depends') == None:
                 raise Exception("Module '{}' __rev__.conf does not contain any dependency information".format(mod_folder))
             

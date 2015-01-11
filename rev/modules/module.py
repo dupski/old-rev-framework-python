@@ -5,7 +5,7 @@ from rev.i18n import translate as _
 from rev.db.exceptions import ValidationError
 from rev.http import RevHTTPController
 
-from .loader import load_data, get_module_data_hash
+from .loader import load_config_file, load_data, get_module_data_hash
 
 from toposort import toposort_flatten
 import importlib
@@ -19,6 +19,8 @@ MODULE_STATUSES = [
     ('to_update', _('To Be Updated')),
     ('to_remove', _('To Be Removed')),
 ]
+
+MODULE_META_CONFIG_KEYS = ['module_name', 'module_description', 'module_version', 'depends']
 
 # Module Metadata container and business logic
 
@@ -63,17 +65,9 @@ class Module(Model):
                 def _add_change(module_name, change_type, change_desc):
                     res.setdefault('changed_modules', {}).setdefault(module_name, {}).setdefault(change_type, []).append(change_desc)
 
-                for meta_key, meta_value in available_modules[mod_name].items():
-                    
-                    # Map conf key names to db names
-                    if meta_key == 'name':
-                        meta_key = 'module_name'
-                    if meta_key == 'description':
-                        meta_key = 'module_description'
-                    if meta_key == 'version':
-                        meta_key = 'module_version'
-                    
-                    if meta_value != db_mod_info[meta_key]:
+                for meta_key in MODULE_META_CONFIG_KEYS:
+                    meta_value = available_modules[mod_name].get(meta_key)
+                    if meta_value and meta_value != db_mod_info[meta_key]:
                         _add_change(mod_name, 'updated', meta_key)
                 
         missing_modules = self.find({'name' : {'$nin' : list(available_modules.keys())}}, read_fields=['name'])
@@ -158,14 +152,10 @@ class Module(Model):
         Take values from the module configuration and build the data needed
         for a rev.modules record
         """
-        
-        return {
-            'name' : module_name,
-            'module_name' : module_info.get('name', None),
-            'module_description' : module_info.get('description', None),
-            'module_version' : module_info.get('version', None),
-            'depends' : module_info.get('depends', None),
-        }
+        module_meta = {}
+        module_meta['name'] = module_name
+        for key in MODULE_META_CONFIG_KEYS:
+            module_meta[key] = module_info.get(key, None)
              
     def update_module_metadata(self, available_modules):
         """
@@ -189,6 +179,7 @@ class Module(Model):
                     self.update({'name' : mod_name}, mod_vals)
             
             if 'removed_modules' in module_changes and module_changes['removed_modules']:
+                #FIX ME!
                 del_ids = [db_ids[mod_name] for mod_name in module_changes['removed_modules']]
                 self.delete({'id':{'$in':del_ids}})
 
@@ -318,7 +309,7 @@ class Module(Model):
         mod_load_order = []
 
         mods_to_load = self.find({'status' : {'$in' : ['installed','to_install','to_update']}}, read_fields='*')
-            
+        
         for mod_rec in mods_to_load:
             mods_to_sort[mod_rec['name']] = set(mod_rec['depends'])
             mod_info[mod_rec['name']] = mod_rec.to_dict()
@@ -337,10 +328,13 @@ class Module(Model):
             mod_m = importlib.import_module(mod)
             module_path = mod_m.__path__[0]
             
-            # Store module metadata in app.modules
-            self._registry.app.module_info[mod] = mod_info[mod]
-            self._registry.app.module_info[mod]['module_path'] = module_path
+            # Load __rev__.conf
+            mod_info[mod].update(load_config_file(os.path.join(module_path, '__rev__.conf')))
             
+            # Update module metadata in app.module_info
+            mod_info[mod]['module_path'] = module_path
+            self._registry.app.module_info[mod] = mod_info[mod]
+                        
             # Run the before-model-load hook (if applicable)
             if getattr(mod_m, 'before_model_load', False):
                 mod_m.before_model_load(self._registry.app, mod_info[mod], syncdb)
