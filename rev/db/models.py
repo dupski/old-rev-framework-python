@@ -33,7 +33,7 @@ class Model():
         # Make sure any mixin classes are also __init__'ed
         super().__init__(*args, **kwargs)
     
-    def find(self, criteria={}, read_fields=['*'], order_by=None, limit=0, offset=0, count_only=False, context={}):
+    def find(self, criteria={}, read_fields='*', order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
         Search the database using the specified criteria, and return the matching data
         """
@@ -105,3 +105,6 @@ class Model():
         res = self._database.delete(self, criteria, limit, context)
         
         return True
+
+    def __repr__(self):
+        return self.__class__.__name__

@@ -24,7 +24,7 @@ class DatabaseProvider(DBProvider):
         if hasattr(model, '_unique'):
             logging.warning('Cannot create unique constraints on InMemoryModels!')
     
-    def find(self, model, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
+    def find(self, model, criteria={}, read_fields='*', order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
         Search the model data using the specified criteria, and return the matching data
         Returns a ModelRecords iterable object

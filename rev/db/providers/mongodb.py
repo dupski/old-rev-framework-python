@@ -59,7 +59,7 @@ class DatabaseProvider(DBProvider):
                         db[model._table_name].ensure_index(index_spec, unique=True )
 
     
-    def find(self, model, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
+    def find(self, model, criteria={}, read_fields='*', order_by=None, limit=0, offset=0, count_only=False, context={}):
         """
         Search the database using the specified criteria, and return the matching data
         """
@@ -79,27 +79,22 @@ class DatabaseProvider(DBProvider):
             limit = None
             offset = None
         else:
+            db_read_fields = read_fields
             if read_fields == '*':
                 # Make sure we read all fields then
-                read_fields = None
+                db_read_fields = None
             if order_by:
                 # Replace asc / desc with db value
                 for ob_key, ob_val in enumerate(order_by):
                     ob_val[1] = ORDER_BY_OPTIONS[ob_val[1]]
         
         db = self._db
-        cr = db[model._table_name].find(spec=criteria, fields=read_fields, sort=order_by, limit=limit, skip=offset)
+        cr = db[model._table_name].find(spec=criteria, fields=db_read_fields, sort=order_by, limit=limit, skip=offset)
         
         if count_only:
             return cr.count()
         else:
-            res = []
-            for rec in cr:
-                if rec['_id']:
-                    rec['id'] = str(rec['_id'])
-                    del rec['_id']
-                res.append(rec)
-            return MongoDBRecordSet(model, res)
+            return MongoDBRecordSet(model, read_fields, cr)
         
     def create(self, model, vals, context={}):
         """
@@ -152,43 +147,27 @@ class DatabaseProvider(DBProvider):
 class MongoDBRecordSet(ModelRecordSet):
     """
     Encapsulates the results of a find() on a Model from MongoDB
-    Currently this simply re-returns the list of results, however in future
-    this could be extended to make use of cursors
     """
-    def __init__(self, model, records):
-        super().__init__(model)
-        self._records = records
-        self._current_record_idx = 0
+    def __init__(self, model, read_fields, cr):
+        super().__init__(model, read_fields)
+        self.cr = cr
         
     def __len__(self):
-        return len(self._records)
+        return self.cr.count()
 
-    def __getitem__(self, key):
-        return MongoDBRecord(self._model, self._records[key])
+    def _process_record(self, record):
+        if record['_id']:
+            record['id'] = str(record['_id'])
+            del record['_id']
+        return record
+
+    def __getitem__(self, item):
+        record = self._process_record(self.cr[item])
+        return ModelRecord(self.model, self.read_fields, record)
     
     def __iter__(self):
         return self
     
     def __next__(self):
-        if self._current_record_idx < len(self._records):
-            item, \
-            self._current_record_idx = \
-                MongoDBRecord(self._model, self._records[self._current_record_idx]), \
-                self._current_record_idx + 1
-            return item
-        else:
-            raise StopIteration()
-
-
-class MongoDBRecord(ModelRecord):
-    """
-    Encapsulates a single database record, normally returned from a ModelRecordSet
-    """
-    def __init__(self, model, record):
-        super().__init__(model)
-        self._record = record
-        
-    def __getitem__(self, key):
-        if key not in self.fields.keys():
-            raise KeyError(key)
-        return self._record.get(key, None)
+        record = self._process_record(self.cr.__next__())
+        return ModelRecord(self.model, self.read_fields, record)

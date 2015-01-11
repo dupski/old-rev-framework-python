@@ -13,7 +13,7 @@ class DBProvider():
         # Create database table or collection for specified model
         pass
     
-    def find(self, model, criteria={}, read_fields=[], order_by=None, limit=0, offset=0, count_only=False, context={}):
+    def find(self, model, criteria={}, read_fields='*', order_by=None, limit=0, offset=0, count_only=False, context={}):
         raise NotImplementedError("Provider does not implement the find() method.")
         
     def create(self, model, vals, context={}):
