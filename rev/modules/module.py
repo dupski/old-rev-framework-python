@@ -278,6 +278,27 @@ class Module(Model):
         if mod_ids['to_remove']:
             self.update({'name':{'$in':mod_ids['to_remove']}}, {'status' : 'installed'})
                         
+    def get_modules_with_changed_data(self):
+        """
+        Compare module data on-disk with the database, and return a list of modules
+        with data that is not synced with the database
+        """
+        mods_to_check = self.find({'status' : 'installed'}, read_fields=['name','module_data_hash'])
+        
+        changed_modules = []
+        
+        for mod in mods_to_check:
+            # Import module so we can determine its directory
+            mod_m = importlib.import_module(mod['name'])
+            module_path = mod_m.__path__[0]
+            # Calculate module data hash
+            dir_hash = get_module_data_hash(module_path)
+            # Compare hashes
+            if dir_hash != mod['module_data_hash']:
+                changed_modules.append(mod['name'])
+        
+        return changed_modules
+    
     def load_modules(self, syncdb=False):
         """
         Loads the module hierarchy. If any modules are set to be installed /
@@ -405,29 +426,21 @@ class Module(Model):
                 mod_m.after_model_load(self._registry.app, mod_info[mod], syncdb)
         
         # 2nd Pass: Check / Load Module XML Data
-        logging.info('Loading Module Data...')
         for mod in mod_load_order:
-            dir_hash = get_module_data_hash(mod_info[mod])
-            
-            if syncdb:
+            if syncdb and mod_info[mod]['status'] in ['to_install', 'to_update']:
+                # Load data from module data folder
                 load_data(mod_info[mod], self._registry)
-                
+                # Update database metadata
+                dir_hash = get_module_data_hash(mod_info[mod]['module_path'])
                 self.update({'name':mod_info[mod]['name']}, {
                     'status' : 'installed',
                     'db_version' : mod_info[mod]['module_version'],
                     'module_data_hash' : dir_hash,
                 })
-
                 # Run the after-data-load hook (if applicable)
                 mod_m = sys.modules[mod]
                 if getattr(mod_m, 'after_data_load', False):
                     mod_m.after_data_load(self._registry.app, mod_info[mod])
-            
-            else:
-                if str(dir_hash) != str(mod_info[mod]['module_data_hash']):
-                    logging.warning("Data for module '{}' has changed. You should run './app.py syncdb' to update the database.".format(mod))
-                else:
-                    logging.debug("Data for module '{}' is up-to-date.".format(mod))
         
         # 3rd Pass: Run the after-app-load hook for all modules (if applicable)
         logging.info("Running 'after_app_load' Actions...")

@@ -14,4 +14,4 @@ from .runserver import RunServerArgParser, RunServerCommand
 from .syncdb import SyncDBArgParser, SyncDBCommand
 
 register_command('runserver', 'starts the rev framework test server', RunServerArgParser, RunServerCommand)
-register_command('syncdb', 'synchronise database metadata', SyncDBArgParser, SyncDBCommand)
+register_command('syncdb', 'synchronise application data with the database', SyncDBArgParser, SyncDBCommand)

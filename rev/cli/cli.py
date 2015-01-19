@@ -3,11 +3,17 @@
 
 from .args import RootArgParser
 import os, sys
+from rev.app.log import LOG_LEVELS
 
 def execute(app):
     
     # Execute command line options based on the specified app instance
+        
+    from . import CLI_COMMANDS
     
+    argp = RootArgParser(app)
+    args = argp.parse_known_args()[0]
+
     # Configure logging to console
     
     import logging
@@ -18,17 +24,14 @@ def execute(app):
         "%(asctime)s [%(log_color)s%(levelname)s%(reset)s] %(message)s",
     ))
     
-    logging.basicConfig(level=logging.DEBUG,
+    loglevel = args.log_level
+    if loglevel.strip().upper() not in LOG_LEVELS:
+        argp.error("error: '%s' is not a valid option for --loglevel\n" % loglevel)
+    
+    logging.basicConfig(level=LOG_LEVELS[loglevel.strip().upper()],
             format='%(asctime)s [%(levelname)s] %(message)s',
             handlers=[#log.FileHandler("revserver.log"),
                 console_log])
-    
-    # Handle command line arguments
-    
-    from . import CLI_COMMANDS
-    
-    argp = RootArgParser(app)
-    args = argp.parse_known_args()[0]
     
     if args.COMMAND == 'help':
         if args.help_command_name in CLI_COMMANDS:

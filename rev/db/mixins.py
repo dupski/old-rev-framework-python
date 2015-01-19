@@ -36,50 +36,42 @@ class XMLDataMixin:
         del update_vals['id']
         self.update({'xml_module' : module, 'xml_id' : elem.attrib['id']}, update_vals, 1, context)
 
-    def xml_modify_from_element(self, module, xml_id, elem, context={}):
+    def xml_modify_from_element(self, module, elem, target_xml_module, target_xml_id, context={}):
         modify_vals = dict(elem.attrib)
+        del modify_vals['id']
         del modify_vals['modify']
         if modify_vals:
-            self.update({'xml_module' : module, 'xml_id' : xml_id}, modify_vals, 1, context)
+            self.update({'xml_module' : target_xml_module, 'xml_id' : target_xml_id}, modify_vals, 1, context)
     
     def xml_import_from_element(self, module, elem, context={}):
 
-        if 'id' not in elem.attrib and 'modify' not in elem.attrib \
-          or ('id' in elem.attrib and 'modify' in elem.attrib):
-            raise XMLImportError("XML elements must have either an 'id' or a 'modify' attribute.")
+        if 'id' not in elem.attrib:
+            raise XMLImportError("XML elements must have an 'id' attribute!")
         
-        if 'id' in elem.attrib:
-            if not re.match("^[A-Za-z0-9_]*$", elem.attrib['id']):
-                raise XMLImportError("'id' attribute must only contain letters, numbers and underscores.")
+        if not re.match("^[A-Za-z0-9_]*$", elem.attrib['id']):
+            raise XMLImportError("'id' attribute must only contain letters, numbers and underscores.")
         
-            xml_id_str = "{}.{}".format(module, elem.attrib['id'])
-            if xml_id_str in self._imported_xml_ids:
-                raise XMLImportError("Duplicated XML element id '{}' in module '{}'.".format(elem.attrib['id'], module))
-            else:
-                self._imported_xml_ids.append(xml_id_str)
-
+        xml_id_str = "{}.{}".format(module, elem.attrib['id'])
+        if xml_id_str in self._imported_xml_ids:
+            raise XMLImportError("Duplicated XML element id '{}' in module '{}'.".format(elem.attrib['id'], module))
+        else:
+            self._imported_xml_ids.append(xml_id_str)
+        
+        if 'modify' in elem.attrib:
+            modify_id = elem.attrib['modify'].split('.')
+            if len(modify_id) != 2:
+                raise XMLImportError("'modify' attribute must be in the format '<module_name>.<xml_id>'.")
+            modify_matches = self.find({'xml_module' : modify_id[0], 'xml_id' : modify_id[1]})
+            if not modify_matches:
+                raise XMLImportError("Could not find {} '{}' specified in the 'modify' attribute. You might need to check your module's dependencies.".format(elem.tag, elem.attrib['modify']))
+            self.xml_modify_from_element(module, elem, modify_id[0], modify_id[1], context)
+        
+        else:
             matches = self.find({'xml_module' : module, 'xml_id' : elem.attrib['id']})
-        
             if len(matches) > 1:
                 raise XMLImportError("Multiple matches for {} with id '{}' from module '{}'!".format(
                                         self.__class__.name, elem.attrib['id'], module))
-            
             if not matches:
                 self.xml_create_from_element(module, elem, context)
             else:
                 self.xml_update_from_element(module, elem, context)
-
-        elif 'modify' in elem.attrib:
-        
-            view_id = elem.attrib['modify'].split('.')
-            
-            if len(view_id) != 2:
-                raise XMLImportError("'modify' attribute must be in the format '<module_name>.<xml_id>'.")
-            
-            matches = self.find({'xml_module' : view_id[0], 'xml_id' : view_id[1]})
-            
-            if not matches:
-                raise XMLImportError("Could not find {} '{}' specified in the 'modify' attribute. You might need to check your module's dependencies.".format(elem.tag, elem.attrib['modify']))
-            
-            self.xml_modify_from_element(view_id[0], view_id[1], elem, context)
-

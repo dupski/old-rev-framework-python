@@ -7,6 +7,7 @@ import logging
 import importlib
 import sys
 
+from rev import PKG_NAME, PKG_VERSION
 from rev.db.registry import ModelRegistry
 from rev.modules import Module
 from rev.modules.staticfiles import StaticFiles, StaticFilesEndpoint
@@ -53,7 +54,14 @@ class RevApp(Flask):
     def init(self, syncdb=False):
         """
         Initialise configuration, database and installed modules
+        
+        syncdb can be 'interactive', 'auto' or False
         """
+
+        logging.info('{} v{}'.format(PKG_NAME, PKG_VERSION))
+        
+        if not syncdb or syncdb == 'auto':
+            logging.info("Starting Rev App '{}' ...".format(self.name))
         
         # initialise database providers
         self.databases = {}
@@ -112,12 +120,23 @@ class RevApp(Flask):
         elif syncdb:
             logging.info('No changes detected to INSTALLED_MODULES setting.')
         
-        # If syncdb=True, schedule all installed modules to be updated
-        if syncdb:
+        if syncdb and syncdb == 'interactive':
+            # If syncdb='interactive', schedule all installed modules to be updated
             installed_modules = module_obj.find({'status' : 'installed'}, read_fields=['name'])
             for mod in installed_modules:
                 module_obj.schedule_operation('update', [mod['name']])
-            
+        else:
+            # Otherwise, check whether module data matches the database
+            changed_modules = module_obj.get_modules_with_changed_data()
+            if changed_modules:
+                change_str = loader.get_changed_data_description(changed_modules)
+                if not syncdb:
+                    change_str += "\nYou should run './app.py syncdb' to reload module data."
+                    logging.warning(change_str)
+                else:
+                    logging.info(change_str)
+                    module_obj.schedule_operation('update', changed_modules)
+        
         # Check if there are pending module operations
         sched_ops = module_obj.get_scheduled_operations()
         
@@ -127,7 +146,7 @@ class RevApp(Flask):
             if not syncdb:
                 op_str += "\nYou should run './app.py syncdb' to apply these changes."
                 logging.warning(op_str)
-            else:
+            elif syncdb != 'auto':
                 logging.info(op_str)
                 response = ''
                 while response not in ['y','n']:
@@ -143,7 +162,7 @@ class RevApp(Flask):
 
         module_obj.load_modules(syncdb)
         
-        if not syncdb:
+        if not syncdb or syncdb == 'auto':
                         
             # initialise static files class
             self.staticfiles = StaticFiles(self)
@@ -165,4 +184,5 @@ class RevApp(Flask):
             logging.debug('Registered HTTP Endpoints:')
             for rule in self.url_map.iter_rules():
                 logging.debug('  '+rule.rule+' => '+rule.endpoint)
-        
+
+            logging.info("Rev App '{}' Initialised.".format(self.name))

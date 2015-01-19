@@ -10,7 +10,7 @@ class SyncDBArgParser(BaseArgParser):
                 usage='%(prog)s syncdb [options]',
                 **kwargs)
         
-        self.description += '\n\n  syncdb - Synchronise application database metadata'
+        self.description += '\n\n  syncdb - Synchronise application data with the database'
     
         self.add_argument('command', help=argparse.SUPPRESS)
 
@@ -25,6 +25,6 @@ class SyncDBCommand(BaseCommand):
 
         logging.info("Running Sync DB for Rev App '{}' ...".format(app.name))
         
-        app.init(syncdb=True)
+        app.init(syncdb='interactive')
 
         logging.info('Sync DB Completed.')

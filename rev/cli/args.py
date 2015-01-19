@@ -2,6 +2,8 @@
 import argparse
 import sys
 
+from rev.app.log import LOG_LEVELS
+
 class BaseArgParser(argparse.ArgumentParser):
     
     def __init__(self, **kwargs):
@@ -13,6 +15,12 @@ class BaseArgParser(argparse.ArgumentParser):
                 add_help=True,
                 formatter_class=argparse.RawTextHelpFormatter,
                 **kwargs)
+
+        self.add_argument('--log-level',
+                          type=str,
+                          nargs='?',
+                          default='INFO',
+                          help='Sets the logging level. Valid options are: ' + str(', '.join(LOG_LEVELS.keys())))
         
     def error(self, message):
         sys.stderr.write('error: %s\n' % message)

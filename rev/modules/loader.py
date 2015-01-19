@@ -69,6 +69,10 @@ def get_module_meta_change_description(meta_changes):
                 meta_change_str += '\n    UPDATED KEYS: ' + ', '.join(mod_change['updated'])
     return meta_change_str
 
+def get_changed_data_description(changed_modules):
+    op_str = 'The following modules have changed data: ' + ', '.join(changed_modules)
+    return op_str
+
 def get_scheduled_operation_description(ops):
     op_str = 'The following module operations are pending:'
     if ops['to_install']:
@@ -141,13 +145,18 @@ def load_data(mod_info, registry):
     return True
 
 
-def get_module_data_hash(mod_info):
+def get_module_data_hash(module_path):
+    """
+    Returns the SHA1 Hash of a module's 'data' directory
+    """
+    data_path = os.path.join(module_path, 'data')
+    return get_directory_hash(data_path, '.xml')
+
+def get_directory_hash(data_path, file_ext=None):
     """
     Returns the SHA1 Hash of the data in a particular directory
     """
-
-    data_path = os.path.join(mod_info['module_path'], 'data')
-
+    
     if not os.path.isdir(data_path):
         return None
     
@@ -157,7 +166,7 @@ def get_module_data_hash(mod_info):
     for root, dirs, files in os.walk(data_path):
         for filename in files:
             
-            if filename[-4:] != '.xml':
+            if file_ext and filename[-(len(file_ext)):].lower() != file_ext.lower():
                 continue
             
             filepath = os.path.join(root, filename)
