@@ -1,15 +1,15 @@
 <?xml version="1.0"?>
 <rev>
 
-	<View modify="rev_app.app_navbar">
+	<View id="rev_auth_navbar" modify="rev_app.app_navbar">
 		
-		<!-- Add Login Menu -->
+		<!-- Add User Menu -->
 		<modify xpath="//ul[@name='navbar_right']" action="insert_inside" position="0">
 		
 	        <li ng-controller="UserMenuController" ng-class="{dropdown: isLoggedIn}" ng-attr-dropdown="isLoggedIn">
 	        
 		        <a href="#/login" ng-if="!isLoggedIn">
-					<span class="glyphicon glyphicon-user" style="margin-right:5px;"> </span> Log In
+					<span class="glyphicon glyphicon-user" style="margin-right:5px;"> </span> Sign In
 				</a>
 				
 				<a href="#" ng-if="isLoggedIn" class="dropdown-toggle" dropdown-toggle="true" role="button">
@@ -19,7 +19,7 @@
 				<ul class="dropdown-menu" ng-if="isLoggedIn" role="menu" name="user_menu">
 					<li><a href="#/preferences" name="preferences_link">Preferences</a></li>
 					<li class="divider"></li>
-					<li><a href="#/logout" name="logout_link">Log Out</a></li>
+					<li><a href="#/logout" name="logout_link">Sign Out</a></li>
 				</ul>
 			</li>
 			
@@ -27,14 +27,50 @@
 		
 	</View>
 
-	<View id="login" name="Login Form">
+	<View id="login" name="Sign In Form">
 		
 		<div class="row" ng-controller="LoginFormController">
-			<div class="col-md-12">
-				<h1>@{{app.name}} Login</h1>
+			<div class="col-md-3"> </div>
+
+			<div class="col-md-6">
 			
-				<button class="btn btn-primary" ng-click="doLogin()">Login</button>
+				<div class="panel panel-primary drop-shadow" style="margin-top:30px;">
+					<div class="panel-heading">
+						<span style="font-size:2em;">Please sign in</span>
+					</div>
+					<div class="panel-body">
+						<form class="form-horizontal">
+							<div class="form-group">
+								<label for="inputEmail3" class="col-sm-2 control-label">Email</label>
+								<div class="col-sm-10">
+									<input type="email" class="form-control" id="inputEmail3" placeholder="Email"/>
+								</div>
+							</div>
+							<div class="form-group">
+								<label for="inputPassword3" class="col-sm-2 control-label">Password</label>
+								<div class="col-sm-10">
+									<input type="password" class="form-control" id="inputPassword3" placeholder="Password"/>
+								</div>
+							</div>
+							<div class="form-group">
+								<div class="col-sm-offset-2 col-sm-10">
+									<div class="checkbox">
+										<label><input type="checkbox"/> Remember me</label>
+									</div>
+								</div>
+							</div>
+							<div class="form-group">
+								<div class="col-sm-offset-2 col-sm-10">
+									<button class="btn btn-primary" ng-click="doLogin()">Sign in</button>
+								</div>
+							</div>
+						</form>
+					</div>
+				</div>
+			
 			</div>
+
+			<div class="col-md-3"> </div>
 		</div>
 		
 	</View>

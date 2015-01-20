@@ -101,11 +101,14 @@ def load_data(mod_info, registry):
 
     """
     Loads all data from .yaml files in a module's data directory
+    
+    Returns True if all data was successfully loaded.
     """
     data_path = os.path.join(mod_info['module_path'], 'data')
     
     if not os.path.isdir(data_path):
-        return False
+        logging.debug("Module '{}' has no data folder.".format(mod_info['name']))
+        return True
 
     logging.info('Loading Module Data for '+mod_info['name'])
 
@@ -122,7 +125,7 @@ def load_data(mod_info, registry):
                 xmltree = etree.parse(xml_path)
             except Exception as e:
                 logging.error("Error loading {}: {}".format(xml_path, e))
-                continue
+                return False
             
             xml_root = xmltree.getroot()
             
@@ -131,16 +134,16 @@ def load_data(mod_info, registry):
                     continue
                 if not registry.model_exists(elem.tag):
                     logging.error("Error in {} on line {}: Model '{}' does not exist.".format(xml_path, elem.sourceline, elem.tag))
-                    continue
+                    return False
                 mod = registry.get(elem.tag)
                 if not isinstance(mod, XMLDataMixin):
                     logging.error("Error in {} on line {}: Model '{}' does not support XML Import.".format(xml_path, elem.sourceline, elem.tag))
-                    continue
+                    return False
                 try:
                     mod.xml_import_from_element(mod_info['name'], elem)
                 except (XMLImportError, ValidationError) as e:
-                    logging.error("Error in {} on line {}: {} XML Import Error: {}".format(xml_path, elem.sourceline, elem.tag, e))
-                    continue
+                    logging.error("{} XML Import Error in {} on line {}\n\n{}".format(elem.tag, xml_path, elem.sourceline, e))
+                    return False
     
     return True
 

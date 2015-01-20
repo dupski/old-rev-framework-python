@@ -3,3 +3,12 @@
 .navbar-fixed-top .navbar-collapse {
 	max-height: none;
 }
+
+/* Panel Styles */
+.drop-shadow {
+    box-shadow: 2px 2px 6px 2px #DDD;
+}
+
+body {
+	background: #EEE;
+}

@@ -429,7 +429,10 @@ class Module(Model):
         for mod in mod_load_order:
             if syncdb and mod_info[mod]['status'] in ['to_install', 'to_update']:
                 # Load data from module data folder
-                load_data(mod_info[mod], self._registry)
+                load_result = load_data(mod_info[mod], self._registry)
+                if not load_result:
+                    logging.error("Error while loading module data!")
+                    break
                 # Update database metadata
                 dir_hash = get_module_data_hash(mod_info[mod]['module_path'])
                 self.update({'name':mod_info[mod]['name']}, {
@@ -443,7 +446,7 @@ class Module(Model):
                     mod_m.after_data_load(self._registry.app, mod_info[mod])
         
         # 3rd Pass: Run the after-app-load hook for all modules (if applicable)
-        logging.info("Running 'after_app_load' Actions...")
+        logging.debug("Running 'after_app_load' Actions...")
         for mod in mod_load_order:
             mod_m = sys.modules[mod]
             if getattr(mod_m, 'after_app_load', False):

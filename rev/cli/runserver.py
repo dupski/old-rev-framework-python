@@ -56,11 +56,26 @@ class RunServerCommand(BaseCommand):
         syncdb = False if args.no_syncdb else 'auto'
         
         # Avoid duplicate initialisation with Werkzeug reloader
-        if not reload or os.environ.get("WERKZEUG_RUN_MAIN") == "true": 
+        if not reload or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
             app.init(syncdb=syncdb)
         
+        # Configure data files to watch when auto-reload is enabled
+        files_to_monitor = []
+        if reload:
+            for mod in app.module_info:
+                mod_path = os.path.join(app.module_info[mod]['module_path'])
+                files_to_monitor.append(os.path.join(mod_path, '__rev__.conf'))
+                # Add all XML data files to monitor list
+                data_path = os.path.join(mod_path, 'data')
+                for root, dirs, files in os.walk(data_path):
+                    for filename in files:
+                        if filename[-4:].lower() == '.xml':
+                            files_to_monitor.append(os.path.join(root, filename))
+        
+        # Launch debug server
         app.run(
             host=args.ip_address,
             port=args.port,
             use_reloader=reload,
+            extra_files=files_to_monitor,
             debug=True)
