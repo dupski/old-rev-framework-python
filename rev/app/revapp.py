@@ -77,7 +77,12 @@ class RevApp(Flask):
         from rev.modules import loader
         
         # load modules
-        available_modules = loader.get_available_modules(self)
+        available_modules = []
+        try:
+            available_modules = loader.get_available_modules(self)
+        except Exception as e:
+            logging.error("Error loading modules: {}".format(e))
+            sys.exit(2)
         
         # Module paths validated. Add them to python path
         for mod_path in self.config['MODULE_PATHS']:

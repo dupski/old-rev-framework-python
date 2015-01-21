@@ -35,6 +35,10 @@ def get_available_modules(app):
         mod_folders = [name for name in os.listdir(mod_path)
                         if os.path.isdir(os.path.join(mod_path, name))]
         for mod_folder in mod_folders:
+            
+            if mod_folder[0] == '.':
+                continue #ignore hidden folders
+            
             try:
                 mod_info = imp.find_module(mod_folder)
                 logging.warning("Module '{}' masks existing module at '{}'".format(mod_folder, mod_info[1]))

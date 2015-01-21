@@ -323,7 +323,6 @@ class Module(Model):
                             'status' : 'not_installed',
                         })
 
-  
         # load modules
         mods_to_sort = {}
         mod_info = {}
