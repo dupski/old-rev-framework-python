@@ -3,7 +3,7 @@ from rev.db import Model, fields
 from rev.i18n import translate as _
 
 from rev.db.exceptions import ValidationError
-from rev.http import RevHTTPController
+from flask.ext.classy import FlaskView
 
 from .loader import load_config_file, load_data, get_module_data_hash
 
@@ -105,44 +105,36 @@ class Module(Model):
             'remove' : [],
         }
 
-        # Find any modules in INSTALLED_MODULES that are not installed
-
-        mods_to_install = self.find({
-                'name' : {'$in' : installed_modules},
-                'status' : {'$nin' : ['installed', 'to_install', 'to_update']}
-            }, read_fields=['name','status'])
-        
-        for op in mods_to_install:
-            ops['install'].append(op['name'])
-        
-        # Work out the list modules that are no longer needed
-        
-        mod_depend_info = self.find({
-                'status' : {'$in' : ['installed','to_install','to_update']}
-            },read_fields=['name','depends'])
-
-        mod_depend_dict = {}
+        # Build dictionary of module statuses and dependancy info
+        mod_depend_info = self.find({}, read_fields=['name','status','depends'])
+        mod_info_dict = {}
         for mod in mod_depend_info:
-            mod_depend_dict[mod['name']] = {
+            mod_info_dict[mod['name']] = {
                 'depends' : mod['depends'],
-                'required' : True if mod['name'] in installed_modules else False
+                'status' : mod['status'],
+                'required' : False,
             }
         
         def tag_module_dependancies(mod_info):
             for dep_mod in mod_info['depends']:
-                if dep_mod in mod_depend_dict:
-                    dep_mod_info = mod_depend_dict[dep_mod]
+                if dep_mod in mod_info_dict:
+                    dep_mod_info = mod_info_dict[dep_mod]
                     if not dep_mod_info['required']:
                         dep_mod_info['required'] = True
                         tag_module_dependancies(dep_mod_info)
 
-        
+        # Recursively tag all modules from INSTALLED_MODULES and their dependancies
         for mod in installed_modules:
-            if mod in mod_depend_dict:
-                tag_module_dependancies(mod_depend_dict[mod])
-                        
-        for mod in mod_depend_dict.keys():
-            if not mod_depend_dict[mod]['required']:
+            if mod in mod_info_dict:
+                tag_module_dependancies(mod_info_dict[mod])
+        
+        # Mark any non-required modules to be uninstalled, and any required
+        # modules that are not currently installed to be installed                
+        for mod in mod_info_dict.keys():
+            if mod_info_dict[mod]['required'] and mod_info_dict[mod]['status'] \
+                    not in ['to_install','to_update','installed']:
+                ops['install'].append(mod)
+            if not mod_info_dict[mod]['required']:
                 ops['remove'].append(mod)
         
         return ops
@@ -156,6 +148,7 @@ class Module(Model):
         module_meta['name'] = module_name
         for key in MODULE_META_CONFIG_KEYS:
             module_meta[key] = module_info.get(key, None)
+        return module_meta
              
     def update_module_metadata(self, available_modules):
         """
@@ -410,7 +403,7 @@ class Module(Model):
                     
                     for msymbol in dir(m):
                         cls = getattr(m, msymbol)
-                        if isinstance(cls, type) and cls is not RevHTTPController and issubclass(cls, RevHTTPController):
+                        if isinstance(cls, type) and cls is not FlaskView and issubclass(cls, FlaskView):
                             
                             logging.debug("Registering HTTP Controller: " + cls.__name__)
                             cls.register(self._registry.app)
