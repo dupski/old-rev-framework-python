@@ -5,8 +5,7 @@ import os
 from copy import copy
 
 from flask import send_from_directory, abort, current_app
-from flask.ext.classy import route
-from rev.http import RevHTTPController
+from flask.ext.classy import FlaskView, route
 
 import logging
 
@@ -49,7 +48,7 @@ class StaticFiles:
                             matched_urls.append(file_url)
         return file_list
 
-class StaticFilesEndpoint(RevHTTPController):
+class StaticFilesEndpoint(FlaskView):
     route_base = '/'
  
     @route('/static/<path:file_url>')
