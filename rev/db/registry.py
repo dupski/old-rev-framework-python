@@ -9,7 +9,9 @@ class ModelRegistry():
     def __init__(self, app):
         
         self.app = app
-        self._models = {}
+        self._classes = {}  # Dictionary of ClassName => <type>
+        self._class_load_order = []  # List of ClassNames
+        self._models = {}  # Dictionary of ModelName => ModalInstance
     
     def set(self, model_name, instance):
         self._models[model_name] = instance

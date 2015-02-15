@@ -1,2 +1,2 @@
 from .provider import DBProvider
-from .models import Model
+from .models import Model, OverrideModel

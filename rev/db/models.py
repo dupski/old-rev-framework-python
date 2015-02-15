@@ -4,7 +4,10 @@ import logging
 from rev.db import fields
 from rev.db.exceptions import ValidationError
 
-class Model():
+class OverrideModel:  # Empty class used to indicate model classes that extend existing models
+    pass
+
+class Model:
     
     def __init__(self, registry, *args, **kwargs):
 

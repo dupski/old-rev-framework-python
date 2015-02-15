@@ -1,5 +1,5 @@
 
-from rev.db import Model, fields
+from rev.db import Model, OverrideModel, fields
 from rev.i18n import translate as _
 
 from rev.db.exceptions import ValidationError
@@ -331,7 +331,7 @@ class Module(Model):
             mod_load_order = toposort_flatten(mods_to_sort)
             self._registry.app.module_load_order = mod_load_order
         
-        # 1st Pass: Initialise Models and HTTP Controllers
+        # 1st Pass: Initialise Modules and HTTP Controllers
         logging.info('Initialising Modules...')
         for mod in mod_load_order:
             
@@ -339,7 +339,11 @@ class Module(Model):
             
             # Import the module
             mod_m = importlib.import_module(mod)
-            module_path = mod_m.__path__[0]
+            try:
+                module_path = mod_m.__path__[0]
+            except TypeError:
+                logging.error("Cannot load module '{}'. Please check it has an __init__,py file!".format(mod))
+                return False
             
             # Load __rev__.conf
             mod_info[mod].update(load_config_file(os.path.join(module_path, '__rev__.conf')))
@@ -372,17 +376,21 @@ class Module(Model):
                     
                     for msymbol in dir(m):
                         cls = getattr(m, msymbol)
-                        if isinstance(cls, type) and issubclass(cls, Model):
-
-                            # Instantiate model and add to registry
-                            # to avoid instantiating 'abstract' classes we check if the
-                            # class has a _description attrib. (could be improved)
-                            
-                            # TODO: Need to work out how inheritance is going to happen!
-                            mod_inst = None
-                            if issubclass(cls, Model) and hasattr(cls, '_description'):
-                                mod_inst = cls(self._registry)
-                            self._registry.set(cls.__name__, mod_inst)
+                        # to avoid instantiating 'abstract' models we check if the
+                        # class has a _description attrib. (room for improvement here!)
+                        if isinstance(cls, type) and cls not in [Model, OverrideModel] and ( \
+                                    (issubclass(cls, Model) and hasattr(cls, '_description')) \
+                                    or issubclass(cls, OverrideModel)):
+                            if msymbol in self._registry._classes:
+                                # Subclass the existing model class and overwrite the entry in _classes
+                                logging.debug("Loading Model Class: {} (Override)".format(msymbol))
+                                new_cls = type(msymbol, (cls, self._registry._classes[msymbol]), {})
+                                self._registry._classes[msymbol] = new_cls
+                            else:
+                                # Add entry to _classes and _class_load_order
+                                logging.debug("Loading Model Class: {}".format(msymbol))
+                                self._registry._class_load_order.append(msymbol)
+                                self._registry._classes[msymbol] = cls
 
             # Initialise the module's http controllers
             has_http = False
@@ -413,6 +421,14 @@ class Module(Model):
             if os.path.isdir(template_path):
                 self._registry.app.register_template_path(template_path)
 
+        # Initialise All Models
+        for cls_name in self._registry._class_load_order:
+            cls = self._registry._classes[cls_name]
+            mod_inst = cls(self._registry)
+            self._registry.set(cls_name, mod_inst)
+
+        for mod in mod_load_order:
+            mod_m = sys.modules[mod]
             # Run the after-model-load hook (if applicable)
             if getattr(mod_m, 'after_model_load', False):
                 mod_m.after_model_load(self._registry.app, mod_info[mod], syncdb)

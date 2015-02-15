@@ -43,6 +43,11 @@ class URLField(TextField):
         super().__init__(label, **kwargs)
         self.multiline = False
 
+class PasswordField(TextField):
+    def __init__(self, label, **kwargs):
+        super().__init__(label, **kwargs)
+        self.multiline = False
+
 class SelectionField(Field):
     def __init__(self, label, selection, **kwargs):
         super().__init__(label, **kwargs)
