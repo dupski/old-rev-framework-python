@@ -145,7 +145,7 @@ def load_data(mod_info, registry):
                     return False
                 try:
                     mod.xml_import_from_element(mod_info['name'], elem)
-                except (XMLImportError, ValidationError) as e:
+                except (XMLImportError, etree.XMLSyntaxError, ValidationError) as e:
                     logging.error("{} XML Import Error in {} on line {}\n\n{}".format(elem.tag, xml_path, elem.sourceline, e))
                     return False
     
