@@ -8,6 +8,12 @@ class Field():
         self.required = kwargs.get('required', True)
         self.readonly = kwargs.get('readonly', False)
         self.default_value = kwargs.get('default_value', None)
+        self.default_widget = kwargs.get('widget', self.__class__.__name__)
+        self.stored = kwargs.get('stored', True)
+    
+    @property
+    def type(self):
+        return self.__class__.__name__
     
     def get_default_value(self):
         return self.default_value
@@ -24,29 +30,30 @@ class RecordIDField(Field):
 # Plain Value Fields
 
 class TextField(Field):
-    def __init__(self, label, multiline=False, **kwargs):
+    def __init__(self, label, **kwargs):
+        self.minlength = kwargs.get('minlength', None)
+        self.maxlength = kwargs.get('maxlength', None)
         super().__init__(label, **kwargs)
-        self.multiline = multiline
 
 class EmailAddressField(TextField):
     def __init__(self, label, **kwargs):
         super().__init__(label, **kwargs)
-        self.multiline = False
 
 class PhoneNumberField(TextField):
     def __init__(self, label, **kwargs):
         super().__init__(label, **kwargs)
-        self.multiline = False
 
 class URLField(TextField):
     def __init__(self, label, **kwargs):
         super().__init__(label, **kwargs)
-        self.multiline = False
 
 class PasswordField(TextField):
     def __init__(self, label, **kwargs):
         super().__init__(label, **kwargs)
-        self.multiline = False
+
+class MultilineTextField(TextField):
+    def __init__(self, label, **kwargs):
+        super().__init__(label, **kwargs)
 
 class SelectionField(Field):
     def __init__(self, label, selection, **kwargs):
